@@ -18,7 +18,7 @@ class UserCreateModel(BaseModel):
 
 
 class UserLoginModel(BaseModel):
-    email: str
+    email: EmailStr
     password: str
 
 
@@ -26,7 +26,7 @@ class UserresponseModel(BaseModel):
     uid: uuid.UUID
     first_name: str
     last_name: str
-    email: str
+    email: EmailStr
     is_verified: bool
     created_at: datetime
     updated_at: datetime

@@ -3,3 +3,4 @@ env
 alembic.ini
 __pycache__
 migration
+.agent

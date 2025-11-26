@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     JWT_SECRET: str
     JWT_ALGORITHM: str
     REDIS_URL: str
+    DOMAIN: str
     model_config = SettingsConfigDict(env_file="backend/src/.env", extra="ignore")
 
 

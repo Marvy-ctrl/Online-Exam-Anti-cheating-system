@@ -2,10 +2,13 @@ import uuid
 from datetime import datetime
 from typing import List, Optional
 from sqlmodel import SQLModel, Field, Column
+from sqlalchemy import Column, Float
 from sqlalchemy.dialects.postgresql import UUID, JSON
 import sqlalchemy.dialects.postgresql as pg
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy import ForeignKey
 from enum import Enum
+from typing import List, Optional
 
 
 class Admin(SQLModel, table=True):
@@ -68,6 +71,42 @@ class Exam(SQLModel, table=True):
     duration_minutes: int
     start_time: datetime
     end_time: datetime
+    created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, default=datetime.now))
+    updated_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, default=datetime.now))
+
+
+class ExamEnrollmentStatus(str):
+    pending = "pending"
+    enrolled = "enrolled"
+
+
+class ExamEnrollment(SQLModel, table=True):
+    __tablename__ = "enrollment"
+    uid: uuid.UUID = Field(
+        sa_column=Column(
+            pg.UUID, primary_key=True, unique=True, nullable=False, default=uuid.uuid4
+        )
+    )
+    exam_uid: uuid.UUID = Field(sa_column=Column(pg.UUID, ForeignKey("exam.uid")))
+    first_name: str
+    last_name: str
+    student_id: str
+    device_id: Optional[str] = Field(default=None, index=True, unique=False)
+    embedding_vector: Optional[List[float]] = Field(sa_column=Column(ARRAY(Float)))
+
+    face_s3_url: Optional[str] = Field(default=None)
+    enrolled_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, default=datetime.now))
+    ip_address: Optional[str] = Field(default=None)
+    status: str = Field(
+        default=ExamEnrollmentStatus.pending,
+        nullable=False,
+        description="Enrollment status, pending or enrolled",
+    )
+    created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, default=datetime.now))
+    updated_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, default=datetime.now))
+
+
+model_config = {"arbitrary_types_allowed": True}
 
 
 class Question(SQLModel, table=True):
@@ -82,6 +121,8 @@ class Question(SQLModel, table=True):
     question_text: str
     options: List[str] = Field(sa_column=Column(JSON))
     correct_answer: str
+    created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, default=datetime.now))
+    updated_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, default=datetime.now))
 
 
 class ExamStatus(str, Enum):
