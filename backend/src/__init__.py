@@ -3,16 +3,17 @@ from contextlib import asynccontextmanager
 from src.db.main import init_db
 from src.db.models import (
     Admin,
-    Student,
     Subject,
     Exam,
     Question,
     ExamSession,
     Snapshot,
     Violation,
+    ExamEnrollment,
 )
 from src.auth.router import auth_router
 from src.exams.routes import exam_router
+from src.students.routes import student_router
 
 
 @asynccontextmanager
@@ -29,3 +30,4 @@ app = FastAPI(lifespan=life_span, version=version)
 
 app.include_router(auth_router, prefix=f"/api/{version}/auth", tags=["auth"])
 app.include_router(exam_router, prefix=f"/api/{version}/exam", tags=["exam"])
+app.include_router(student_router, prefix=f"/api/{version}/student", tags=["student"])

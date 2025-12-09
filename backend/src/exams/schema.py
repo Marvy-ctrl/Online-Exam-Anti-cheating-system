@@ -61,6 +61,7 @@ class StudentPreEnrollModel(BaseModel):
     first_name: str
     last_name: str
     student_id: str
+    email: str
 
 
 class StudentPreEnrollResponseModel(BaseModel):
@@ -68,5 +69,15 @@ class StudentPreEnrollResponseModel(BaseModel):
     exam_uid: uuid.UUID
     first_name: str
     last_name: str
+    email: str
     student_id: str
     status: str = "pending"
+
+
+class EnrollLinkModel(BaseModel):
+    link_start_time: datetime
+    link_end_time: datetime
+
+
+class QuestionUploadModel(BaseModel):
+    questions: str

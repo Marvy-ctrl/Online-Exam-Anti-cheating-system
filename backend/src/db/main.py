@@ -4,7 +4,6 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from src.config import Config
 from src.db.models import (
     Admin,
-    Student,
     Subject,
     Exam,
     Question,

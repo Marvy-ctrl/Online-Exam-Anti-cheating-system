@@ -17,8 +17,10 @@ from .schema import (
     ExamUpdateModel,
     StudentPreEnrollModel,
     StudentPreEnrollResponseModel,
+    EnrollLinkModel,
 )
 from src.config import Config
+from datetime import datetime, timedelta, timezone
 
 exam_router = APIRouter()
 exam_service = ExamService()
@@ -52,15 +54,38 @@ async def create_exam(
     return new_exam
 
 
-@exam_router.get("/enroll_link")
+@exam_router.post("/{exam_uid}/enroll_link")
 async def generate_enroll_link(
+    exam_uid: str,
+    link_data: EnrollLinkModel,
+    session: AsyncSession = Depends(get_session),
     token_details: dict = Depends(access_token_bearer),
+    admin_only=Depends(role),
 ):
-    email = token_details["user"]["email"]
-    token = create_url_safe_token({"email": email})
 
-    enroll_url = f"http://{Config.DOMAIN}/api/v1/exam/enroll/{token}"
-    return {"enroll_link": enroll_url}
+    exam = await exam_service.get_an_exam(exam_uid, session)
+    if not exam:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Exam not found"
+        )
+
+    token = create_url_safe_token({"exam_uid": exam_uid})
+
+    enroll_url = f"http://{Config.DOMAIN}/api/v1/student/enroll/{token}"
+    exam.enroll_link = enroll_url
+    exam.link_start_time = link_data.link_start_time
+    exam.link_end_time = link_data.link_end_time
+
+    session.add(exam)
+    await session.commit()
+
+    return {
+        "enroll_link": enroll_url,
+        "exam_uid": exam_uid,
+        "exam_title": exam.title,
+        "exam_link_start_time": exam.link_start_time.isoformat(),
+        "exam_link_end_time": exam.link_end_time.isoformat(),
+    }
 
 
 @exam_router.get("/get_all_exams")
@@ -130,6 +155,7 @@ async def pre_enroll(
     student_details: StudentPreEnrollModel,
     session: AsyncSession = Depends(get_session),
     token_details: dict = Depends(access_token_bearer),
+    admin_only=Depends(role),
 ):
 
     if token_details["user"]["role"] != "admin":
@@ -141,3 +167,8 @@ async def pre_enroll(
         raise HTTPException(status_code=404, detail="Exam not found")
 
     return enroll
+
+
+@exam_router.post("/{exam_uid}/upload")
+async def upload_questions():
+    pass

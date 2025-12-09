@@ -52,6 +52,7 @@ class ExamService:
             exam_uid=exam_uid,
             first_name=student_details.first_name,
             last_name=student_details.last_name,
+            email=student_details.email,
             student_id=student_details.student_id,
             status="pending",
             embedding_vector=None,
