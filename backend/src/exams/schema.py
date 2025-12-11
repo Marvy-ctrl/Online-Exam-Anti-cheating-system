@@ -2,6 +2,7 @@ from pydantic import BaseModel
 from datetime import datetime
 from enum import Enum
 import uuid
+from typing import List, Optional
 from uuid import UUID
 
 
@@ -26,6 +27,7 @@ class ExamCreateModel(BaseModel):
     admin_uid: UUID = None
     start_time: datetime
     end_time: datetime
+    description: Optional[str]
     role: UserRole = UserRole.admin
 
 
@@ -35,7 +37,7 @@ class ExamResponseModel(BaseModel):
     duration_minutes: int
     subject_uid: uuid.UUID
     admin_uid: UUID = None
-
+    description: Optional[str]
     start_time: datetime
     end_time: datetime
     role: UserRole = UserRole.admin
@@ -77,7 +79,3 @@ class StudentPreEnrollResponseModel(BaseModel):
 class EnrollLinkModel(BaseModel):
     link_start_time: datetime
     link_end_time: datetime
-
-
-class QuestionUploadModel(BaseModel):
-    questions: str

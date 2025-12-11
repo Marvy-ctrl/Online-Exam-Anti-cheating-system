@@ -17,8 +17,8 @@ from .utils import (
     decode_token,
     decode_url_safe_token,
 )
-from .dependencies import AccessTokenBearer
-from datetime import timedelta
+from .dependencies import AccessTokenBearer, RefreshTokenBearer
+from datetime import timedelta, datetime, timezone
 
 access_token_bearer = AccessTokenBearer()
 auth_router = APIRouter()
@@ -82,3 +82,16 @@ async def login(details: UserLoginModel, session: AsyncSession = Depends(get_ses
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN, detail="Incorrect Details"
     )
+
+
+@auth_router.post("/refresh_token")
+async def refresh_token(
+    token_details: dict = Depends(RefreshTokenBearer()),
+):
+    """
+    Generate a new access token using a valid refresh token.
+    The RefreshTokenBearer already validates the token and checks expiry.
+    """
+    new_access_token = create_access_token(user_data=token_details["user"])
+
+    return JSONResponse(content={"access_token": new_access_token})

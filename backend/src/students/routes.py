@@ -41,7 +41,7 @@ async def register_face(
     response_model=StudentEnrollResponse,
     status_code=status.HTTP_200_OK,
 )
-async def enroll_student(
+async def student_enroll(
     token: str,
     enrollment_input: StudentEnrollModel,
     request: Request,

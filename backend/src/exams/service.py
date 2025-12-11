@@ -6,7 +6,14 @@ from .schema import (
     StudentPreEnrollModel,
 )
 from src.db.main import get_session
-from src.db.models import Subject, Exam, ExamEnrollment
+from src.db.models import (
+    Subject,
+    Exam,
+    ExamEnrollment,
+    Question,
+    Options,
+    ExamEnrollmentStatus,
+)
 from sqlmodel.ext.asyncio.session import AsyncSession
 from uuid import UUID
 from sqlmodel import select, desc
@@ -54,10 +61,9 @@ class ExamService:
             last_name=student_details.last_name,
             email=student_details.email,
             student_id=student_details.student_id,
-            status="pending",
+            status=ExamEnrollmentStatus.pending,
             embedding_vector=None,
-            photo_url=None,
-            enrolled_at=None,
+            face_s3_url=None,
         )
 
         session.add(new_student)

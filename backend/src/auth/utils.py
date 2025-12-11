@@ -2,6 +2,8 @@ from src.config import Config
 from passlib.context import CryptContext
 from itsdangerous import URLSafeTimedSerializer
 from datetime import timedelta, datetime, timezone
+from fastapi import status
+from fastapi.exceptions import HTTPException
 import jwt
 import uuid
 
@@ -40,10 +42,27 @@ def create_access_token(
 
 
 def decode_token(token: str) -> dict:
-    token_data = jwt.decode(
-        jwt=token, key=Config.JWT_SECRET, algorithms=[Config.JWT_ALGORITHM]
-    )
-    return token_data
+    try:
+        token_data = jwt.decode(
+            jwt=token, key=Config.JWT_SECRET, algorithms=[Config.JWT_ALGORITHM]
+        )
+        return token_data
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={
+                "error": "Access token has expired",
+                "resolution": "Please login again to get a new token",
+            },
+        )
+    except jwt.InvalidTokenError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={
+                "error": "Invalid token",
+                "resolution": "Please provide a valid access token",
+            },
+        )
 
 
 serializer = URLSafeTimedSerializer(

@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 from typing import List, Optional
-from sqlmodel import SQLModel, Field, Column
+from sqlmodel import SQLModel, Field, Column, Relationship
 from sqlalchemy import Column, Float
 from sqlalchemy.dialects.postgresql import JSON
 import sqlalchemy.dialects.postgresql as pg
@@ -36,6 +36,8 @@ class Admin(SQLModel, table=True):
         )
     )
 
+    exams: List["Exam"] = Relationship(back_populates="admin")
+
 
 class Subject(SQLModel, table=True):
     __tablename__ = "subject"
@@ -46,6 +48,8 @@ class Subject(SQLModel, table=True):
         )
     )
     name: str
+
+    exams: List["Exam"] = Relationship(back_populates="subject")
 
 
 class Exam(SQLModel, table=True):
@@ -95,8 +99,14 @@ class Exam(SQLModel, table=True):
         )
     )
 
+    admin: "Admin" = Relationship(back_populates="exams")
+    subject: Optional["Subject"] = Relationship(back_populates="exams")
+    questions: List["Question"] = Relationship(back_populates="exam")
+    enrollments: List["ExamEnrollment"] = Relationship(back_populates="exam")
+    sessions: List["ExamSession"] = Relationship(back_populates="exam")
 
-class ExamEnrollmentStatus(str):
+
+class ExamEnrollmentStatus(str, Enum):
     pending = "pending"
     enrolled = "enrolled"
 
@@ -123,9 +133,14 @@ class ExamEnrollment(SQLModel, table=True):
         )
     )
     ip_address: Optional[str] = Field(default=None)
-    status: str = Field(
-        default=ExamEnrollmentStatus.pending,
-        nullable=False,
+    status: ExamEnrollmentStatus = Field(
+        sa_column=Column(
+            pg.ENUM(
+                ExamEnrollmentStatus, name="exam_enrollment_status", create_type=True
+            ),
+            nullable=False,
+            default=ExamEnrollmentStatus.pending,
+        ),
         description="Enrollment status, pending or enrolled",
     )
     created_at: datetime = Field(
@@ -139,8 +154,10 @@ class ExamEnrollment(SQLModel, table=True):
         )
     )
 
-
-model_config = {"arbitrary_types_allowed": True}
+    exam: "Exam" = Relationship(back_populates="enrollments")
+    sessions: List["ExamSession"] = Relationship(back_populates="enrollment")
+    snapshots: List["Snapshot"] = Relationship(back_populates="enrollment")
+    violations: List["Violation"] = Relationship(back_populates="student")
 
 
 class Question(SQLModel, table=True):
@@ -165,6 +182,9 @@ class Question(SQLModel, table=True):
         )
     )
 
+    exam: "Exam" = Relationship(back_populates="questions")
+    options: List["Options"] = Relationship(back_populates="question")
+
 
 class Options(SQLModel, table=True):
     __tablename__ = "options"
@@ -173,12 +193,13 @@ class Options(SQLModel, table=True):
             pg.UUID, primary_key=True, unique=True, nullable=False, default=uuid.uuid4
         ),
     )
-    question_id: uuid.UUID = Field(
+    question_uid: uuid.UUID = Field(
         sa_column=Column(pg.UUID, ForeignKey("question.uid"))
     )
     option_text: str
     is_correct: bool
     order_index: int
+    question: "Question" = Relationship(back_populates="options")
 
 
 class ExamStatus(str, Enum):
@@ -199,16 +220,28 @@ class ExamSession(SQLModel, table=True):
         sa_column=Column(pg.UUID, ForeignKey("enrollment.uid"))
     )
     exam_uid: uuid.UUID = Field(sa_column=Column(pg.UUID, ForeignKey("exam.uid")))
-    start_time: datetime
-    end_time: datetime = Field(sa_column=Column(nullable=True))
+    start_time: datetime = Field(
+        sa_column=Column(
+            TIMESTAMP(timezone=True), default=lambda: datetime.now(timezone.utc)
+        )
+    )
+    end_time: Optional[datetime] = Field(
+        sa_column=Column(TIMESTAMP(timezone=True), nullable=True)
+    )
     score: Optional[float] = None
     status: ExamStatus = Field(
         sa_column=Column(
-            pg.ENUM(ExamStatus, name="exam_status"),
+            pg.ENUM(ExamStatus, name="exam_status", create_type=True),
             nullable=False,
             default=ExamStatus.not_started,
         ),
     )
+
+    enrollment: "ExamEnrollment" = Relationship(back_populates="sessions")
+    exam: "Exam" = Relationship(back_populates="sessions")
+    answers: List["StudentAnswers"] = Relationship(back_populates="session")
+    snapshots: List["Snapshot"] = Relationship(back_populates="session")
+    violations: List["Violation"] = Relationship(back_populates="session")
 
 
 class StudentAnswers(SQLModel, table=True):
@@ -218,17 +251,23 @@ class StudentAnswers(SQLModel, table=True):
             pg.UUID, primary_key=True, unique=True, nullable=False, default=uuid.uuid4
         ),
     )
-    session_id: uuid.UUID = Field(
+    session_uid: uuid.UUID = Field(
         sa_column=Column(pg.UUID, ForeignKey("exam_session.uid"))
     )
-    question_id: uuid.UUID = Field(
+    question_uid: uuid.UUID = Field(
         sa_column=Column(pg.UUID, ForeignKey("question.uid"))
     )
-    selected_option_id: uuid.UUID = Field(
+    selected_option_uid: uuid.UUID = Field(
         sa_column=Column(pg.UUID, ForeignKey("options.uid"))
     )
     is_correct: bool
-    answered_at: datetime = Field(sa_column=Column(nullable=True))
+    answered_at: Optional[datetime] = Field(
+        sa_column=Column(TIMESTAMP(timezone=True), nullable=True)
+    )
+
+    session: "ExamSession" = Relationship(back_populates="answers")
+    question: "Question" = Relationship()
+    selected_option: "Options" = Relationship()
 
 
 class Snapshot(SQLModel, table=True):
@@ -248,7 +287,14 @@ class Snapshot(SQLModel, table=True):
     image_path: str
     face_matches: bool = True
     multiple_faces_detected: bool = False
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(
+        sa_column=Column(
+            TIMESTAMP(timezone=True), default=lambda: datetime.now(timezone.utc)
+        )
+    )
+
+    enrollment: "ExamEnrollment" = Relationship(back_populates="snapshots")
+    session: "ExamSession" = Relationship(back_populates="snapshots")
 
 
 class ViolationType(str, Enum):
@@ -272,6 +318,17 @@ class Violation(SQLModel, table=True):
         sa_column=Column(pg.UUID, ForeignKey("exam_session.uid"))
     )
     violation_type: ViolationType = Field(
-        sa_column=Column(pg.ENUM(ViolationType, name="violation_type", nullable=False))
+        sa_column=Column(
+            pg.ENUM(
+                ViolationType, name="violation_type", create_type=True, nullable=False
+            )
+        )
     )
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(
+        sa_column=Column(
+            TIMESTAMP(timezone=True), default=lambda: datetime.now(timezone.utc)
+        )
+    )
+
+    student: "ExamEnrollment" = Relationship(back_populates="violations")
+    session: "ExamSession" = Relationship(back_populates="violations")

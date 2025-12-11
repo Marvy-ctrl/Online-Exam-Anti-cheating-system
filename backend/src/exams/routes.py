@@ -20,7 +20,6 @@ from .schema import (
     EnrollLinkModel,
 )
 from src.config import Config
-from datetime import datetime, timedelta, timezone
 
 exam_router = APIRouter()
 exam_service = ExamService()
@@ -167,8 +166,3 @@ async def pre_enroll(
         raise HTTPException(status_code=404, detail="Exam not found")
 
     return enroll
-
-
-@exam_router.post("/{exam_uid}/upload")
-async def upload_questions():
-    pass
