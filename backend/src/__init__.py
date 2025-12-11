@@ -36,4 +36,6 @@ app.include_router(student_router, prefix=f"/api/{version}/student", tags=["stud
 app.include_router(
     questions_router, prefix=f"/api/{version}/questions", tags=["questions"]
 )
-app.include_router(exam_session_router, prefix="/exam-session", tags=["exam_session"])
+app.include_router(
+    exam_session_router, prefix=f"/api/{version}/exam_session", tags=["exam_session"]
+)
