@@ -15,6 +15,7 @@ from src.auth.router import auth_router
 from src.exams.routes import exam_router
 from src.students.routes import student_router
 from src.questions.routes import questions_router
+from src.exam_session.routes import exam_session_router
 
 
 @asynccontextmanager
@@ -35,3 +36,4 @@ app.include_router(student_router, prefix=f"/api/{version}/student", tags=["stud
 app.include_router(
     questions_router, prefix=f"/api/{version}/questions", tags=["questions"]
 )
+app.include_router(exam_session_router, prefix="/exam-session", tags=["exam_session"])

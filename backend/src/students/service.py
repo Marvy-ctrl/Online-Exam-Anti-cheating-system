@@ -52,9 +52,6 @@ class StudentService:
         now = datetime.now(timezone.utc)
         start = local_to_utc(exam.link_start_time) if exam.link_start_time else None
         end = local_to_utc(exam.link_end_time) if exam.link_end_time else None
-        print("NOW:", now)
-        print("START:", start)
-        print("END:", end)
 
         if start and now < start:
             raise HTTPException(400, "Enrollment has not started yet")
@@ -94,7 +91,7 @@ class StudentService:
             enrollment_record.embedding_vector = enrollment_input.embedding_vector
         if enrollment_input.face_s3_url:
             enrollment_record.face_s3_url = enrollment_input.face_s3_url
-        enrollment_record.status = "enrolled"
+        enrollment_record.status = "pending"
         enrollment_record.updated_at = datetime.now()
 
         session.add(enrollment_record)
@@ -178,6 +175,7 @@ class StudentService:
         # 6. Update enrollment record with face embedding
         enrollment_record.embedding_vector = face_embedding
         enrollment_record.updated_at = datetime.now()
+        enrollment_record.status = "enrolled"
 
         session.add(enrollment_record)
         await session.commit()
