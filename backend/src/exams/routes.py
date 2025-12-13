@@ -18,6 +18,8 @@ from .schema import (
     StudentPreEnrollModel,
     StudentPreEnrollResponseModel,
     EnrollLinkModel,
+    QuestionUploadModel,
+    OptionsUploadModel,
 )
 from src.config import Config
 
