@@ -225,6 +225,9 @@ class ExamSession(SQLModel, table=True):
             TIMESTAMP(timezone=True), default=lambda: datetime.now(timezone.utc)
         )
     )
+    expected_end_time: Optional[datetime] = Field(
+        sa_column=Column(TIMESTAMP(timezone=True), nullable=True)
+    )
     end_time: Optional[datetime] = Field(
         sa_column=Column(TIMESTAMP(timezone=True), nullable=True)
     )

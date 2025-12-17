@@ -29,6 +29,6 @@ async def start_exam(
         message="Exam started successfully",
         session_uid=exam_session.uid,
         start_time=exam_session.start_time,
-        end_time=exam_session.end_time,
+        expected_end_time=exam_session.expected_end_time,
         duration_minutes=exam.duration_minutes,
     )

@@ -11,5 +11,5 @@ class StartExamResponse(BaseModel):
     message: str
     session_uid: UUID
     start_time: datetime
-    end_time: datetime
+    expected_end_time: datetime
     duration_minutes: int
