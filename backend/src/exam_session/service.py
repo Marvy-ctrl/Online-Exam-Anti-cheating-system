@@ -225,7 +225,7 @@ class ExamSessionService:
 
         current_time = datetime.now(timezone.utc)
 
-        # Reject late submissions - must submit before or at expected end time
+        
         if current_time > exam_session.expected_end_time:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
