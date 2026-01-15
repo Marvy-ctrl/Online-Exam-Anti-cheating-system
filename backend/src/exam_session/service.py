@@ -4,6 +4,8 @@ from src.db.models import (
     ExamSession,
     ExamEnrollmentStatus,
     ExamStatus,
+    Question,
+    Options,
 )
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -186,6 +188,56 @@ class ExamSessionService:
         await session.refresh(new_session)
 
         return new_session, exam
+
+    async def choose_options(
+        self,
+        exam_session_uid: str,
+        student_uid: str,
+        question_uid: str,
+        selected_option_uids: list[str],
+        session: AsyncSession,
+    ):
+        statement = select(ExamSession).where(ExamSession.uid == exam_session_uid)
+        result = await session.exec(statement)
+        exam_session = result.first()
+
+        if not exam_session:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Exam session not found",
+            )
+
+        if exam_session.status != ExamStatus.in_progress:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Exam session is not active",
+            )
+
+        statement = select(ExamEnrollment).where(
+            ExamEnrollment.student_uid == student_uid,
+            ExamEnrollment.exam_uid == exam_session.exam_uid,
+        )
+        result = await session.exec(statement)
+        enrollment = result.first()
+
+        if not enrollment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Student is not enrolled for this exam",
+            )
+
+        statement = select(Question).where(
+            Question.uid == question_uid,
+            Question.exam_uid == exam_session.exam_uid,
+        )
+        result = await session.exec(statement)
+        question = result.first()
+
+        if not question:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Question not found for this exam",
+            )
 
     async def submit_exam(self, exam_uid: str, student_uid: str, session: AsyncSession):
 
