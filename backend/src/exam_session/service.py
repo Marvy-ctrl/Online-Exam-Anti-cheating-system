@@ -188,15 +188,13 @@ class ExamSessionService:
         return new_session, exam
 
     async def submit_exam(self, exam_uid: str, student_uid: str, session: AsyncSession):
-        """Submit an exam session and mark it as completed."""
-        # Get the exam
+
         exam = await exam_service.get_an_exam(exam_uid, session)
         if not exam:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Exam not found"
             )
 
-        # Get the exam session
         session_statement = select(ExamSession).where(
             ExamSession.student_uid == student_uid, ExamSession.exam_uid == exam_uid
         )
@@ -209,14 +207,12 @@ class ExamSessionService:
                 detail="Exam session not found. Please start the exam first.",
             )
 
-        # Check if already submitted
         if exam_session.status == ExamStatus.submitted:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Exam has already been submitted",
             )
 
-        # Check if exam session is in progress
         if exam_session.status != ExamStatus.in_progress:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -225,14 +221,12 @@ class ExamSessionService:
 
         current_time = datetime.now(timezone.utc)
 
-        
         if current_time > exam_session.expected_end_time:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Submission deadline has passed. Expected end time was {exam_session.expected_end_time.isoformat()}",
             )
 
-        # Update the session
         exam_session.end_time = current_time
         exam_session.status = ExamStatus.submitted
 
