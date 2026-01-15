@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, status
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.db.main import get_session
 from .service import ExamSessionService
-from .schema import StartExamRequest, StartExamResponse
+from .schema import StartExamRequest, StartExamResponse, SubmitExamResponse
 
 exam_session_router = APIRouter()
 session_service = ExamSessionService()
@@ -31,4 +31,18 @@ async def start_exam(
         start_time=exam_session.start_time,
         expected_end_time=exam_session.expected_end_time,
         duration_minutes=exam.duration_minutes,
+    )
+
+
+@exam_session_router.post(
+    "/{exam_uid}/student/{student_uid}/submit_answers",
+    response_model=SubmitExamResponse,
+)
+async def submit_answers(
+    exam_uid: str, student_uid: str, session: AsyncSession = Depends(get_session)
+):
+    submit = await session_service.submit_exam(exam_uid, student_uid, session)
+    return SubmitExamResponse(
+        message="Exam submitted successfully, You may exit the hall now",
+        submitted_time=submit.end_time,
     )

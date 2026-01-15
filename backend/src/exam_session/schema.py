@@ -13,3 +13,8 @@ class StartExamResponse(BaseModel):
     start_time: datetime
     expected_end_time: datetime
     duration_minutes: int
+
+
+class SubmitExamResponse(BaseModel):
+    message: str
+    submitted_time: datetime
