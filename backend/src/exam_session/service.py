@@ -6,6 +6,7 @@ from src.db.models import (
     ExamStatus,
     Question,
     Options,
+    StudentAnswers,
 )
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -214,7 +215,7 @@ class ExamSessionService:
             )
 
         statement = select(ExamEnrollment).where(
-            ExamEnrollment.student_uid == student_uid,
+            ExamEnrollment.uid == student_uid,
             ExamEnrollment.exam_uid == exam_session.exam_uid,
         )
         result = await session.exec(statement)
@@ -238,6 +239,69 @@ class ExamSessionService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Question not found for this exam",
             )
+
+        # Validate selected options if any are provided
+        if selected_option_uids:
+            # Check for duplicates
+            unique_option_uids = list(set(selected_option_uids))
+            if len(unique_option_uids) != len(selected_option_uids):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Duplicate options detected. Each option can only be selected once.",
+                )
+
+            # Validate options exist and belong to this question
+            result = await session.exec(
+                select(Options).where(
+                    Options.uid.in_(selected_option_uids),
+                    Options.question_uid == question_uid,
+                )
+            )
+            options = result.all()
+
+            if len(options) != len(selected_option_uids):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="One or more selected options are invalid for this question",
+                )
+
+        result = await session.exec(
+            select(StudentAnswers).where(
+                StudentAnswers.session_uid == exam_session_uid,
+                StudentAnswers.question_uid == question_uid,
+            )
+        )
+        existing_answer = result.first()
+
+        if existing_answer:
+            existing_answer.selected_option_uids = selected_option_uids
+            existing_answer.updated_at = datetime.now(timezone.utc)
+            session.add(existing_answer)
+            await session.commit()
+            await session.refresh(existing_answer)
+
+            return {
+                "message": "Answer updated successfully",
+                "answer_uid": existing_answer.uid,
+            }
+
+        else:
+            new_answer = StudentAnswers(
+                exam_session_uid=exam_session_uid,
+                question_uid=question_uid,
+                selected_option_uids=selected_option_uids,
+                created_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc),
+            )
+
+            session.add(new_answer)
+            await session.commit()
+            await session.refresh(new_answer)
+
+            return {
+                "message": "Answer saved successfully",
+                "answer_uid": new_answer.uid,
+            }
 
     async def submit_exam(self, exam_uid: str, student_uid: str, session: AsyncSession):
 

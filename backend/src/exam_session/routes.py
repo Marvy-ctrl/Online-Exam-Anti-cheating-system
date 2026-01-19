@@ -1,8 +1,15 @@
 from fastapi import APIRouter, Depends, status
+from fastapi.responses import JSONResponse
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.db.main import get_session
 from .service import ExamSessionService
-from .schema import StartExamRequest, StartExamResponse, SubmitExamResponse
+from .schema import (
+    StartExamRequest,
+    StartExamResponse,
+    SubmitExamResponse,
+    ChooseOptionsRequest,
+    ChooseOptionsResponse,
+)
 
 exam_session_router = APIRouter()
 session_service = ExamSessionService()
@@ -31,6 +38,30 @@ async def start_exam(
         start_time=exam_session.start_time,
         expected_end_time=exam_session.expected_end_time,
         duration_minutes=exam.duration_minutes,
+    )
+
+
+@exam_session_router.post(
+    "/{exam_uid}/student/{student_uid}/questions/{question_uid}/answer",
+    response_model=ChooseOptionsResponse,
+)
+async def choose_options(
+    exam_uid: str,
+    student_uid: str,
+    question_uid: str,
+    request_data: ChooseOptionsRequest,
+    session: AsyncSession = Depends(get_session),
+):
+    result = await session_service.choose_options(
+        exam_session_uid=request_data.exam_session_uid,
+        student_uid=student_uid,
+        question_uid=question_uid,
+        selected_option_uids=request_data.selected_option_uids,
+        session=session,
+    )
+
+    return ChooseOptionsResponse(
+        message=result["message"], answer_uid=result["answer_uid"]
     )
 
 

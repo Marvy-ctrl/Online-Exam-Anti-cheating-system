@@ -1,6 +1,7 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import datetime
 from uuid import UUID
+from typing import List
 
 
 class StartExamRequest(BaseModel):
@@ -13,6 +14,19 @@ class StartExamResponse(BaseModel):
     start_time: datetime
     expected_end_time: datetime
     duration_minutes: int
+
+
+class ChooseOptionsRequest(BaseModel):
+    exam_session_uid: str
+    selected_option_uids: List[str] = Field(
+        default=[],
+        description="List of selected option UIDs. Empty list for unanswered questions.",
+    )
+
+
+class ChooseOptionsResponse(BaseModel):
+    message: str
+    answer_uid: UUID
 
 
 class SubmitExamResponse(BaseModel):
