@@ -239,18 +239,6 @@ class ExamSessionService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Question not found for this exam",
             )
-
-        # Validate selected options if any are provided
-        if selected_option_uids:
-            # Check for duplicates
-            unique_option_uids = list(set(selected_option_uids))
-            if len(unique_option_uids) != len(selected_option_uids):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Duplicate options detected. Each option can only be selected once.",
-                )
-
-            # Validate options exist and belong to this question
             result = await session.exec(
                 select(Options).where(
                     Options.uid.in_(selected_option_uids),
@@ -258,11 +246,10 @@ class ExamSessionService:
                 )
             )
             options = result.all()
-
             if len(options) != len(selected_option_uids):
                 raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="One or more selected options are invalid for this question",
+                    400,
+                    "One or more selected options are invalid for this question",
                 )
 
         result = await session.exec(
