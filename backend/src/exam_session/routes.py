@@ -9,6 +9,8 @@ from .schema import (
     SubmitExamResponse,
     ChooseOptionsRequest,
     ChooseOptionsResponse,
+    VerifyFaceRequest,
+    VerifyFaceResponse,
 )
 
 exam_session_router = APIRouter()
@@ -76,4 +78,28 @@ async def submit_answers(
     return SubmitExamResponse(
         message="Exam submitted successfully, You may exit the hall now",
         submitted_time=submit.end_time,
+    )
+
+
+@exam_session_router.post(
+    "/{exam_uid}/student/{student_uid}/verify-face",
+    response_model=VerifyFaceResponse,
+)
+async def verify_face(
+    exam_uid: str,
+    student_uid: str,
+    request_data: VerifyFaceRequest,
+    session: AsyncSession = Depends(get_session),
+):
+    result = await session_service.verify_face_loop(
+        exam_uid=exam_uid,
+        student_uid=student_uid,
+        live_image_base64=request_data.face_image,
+        session=session,
+    )
+
+    return VerifyFaceResponse(
+        status=result["status"],
+        message=result["message"],
+        violation_type=result["violation_type"],
     )

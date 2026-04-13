@@ -32,3 +32,13 @@ class ChooseOptionsResponse(BaseModel):
 class SubmitExamResponse(BaseModel):
     message: str
     submitted_time: datetime
+
+
+class VerifyFaceRequest(BaseModel):
+    face_image: str
+
+
+class VerifyFaceResponse(BaseModel):
+    status: str  # "ok" or "violation"
+    message: str
+    violation_type: str | None = None

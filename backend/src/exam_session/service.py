@@ -7,6 +7,9 @@ from src.db.models import (
     Question,
     Options,
     StudentAnswers,
+    Snapshot,
+    Violation,
+    ViolationType,
 )
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession

@@ -14,7 +14,7 @@ from src.db.models import (
 
 
 async_engine: AsyncEngine = create_async_engine(
-    Config.DATABASE_URL, connect_args={"ssl": True}
+    Config.DATABASE_URL, connect_args={"ssl": False}
 )
 
 async_session_maker = async_sessionmaker(

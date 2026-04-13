@@ -6,21 +6,52 @@ from fastapi import status
 from fastapi.exceptions import HTTPException
 import jwt
 import uuid
+import bcrypt
 
 ACCESS_TOKEN_EXPIRY = 3600
 
 password_context = CryptContext(schemes=["bcrypt"])
 
 
-def hash_password(password: str):
-    hashed = password_context.hash(password)
-    # print(hashed)
-    return hashed
+# def hash_password(password: str) -> str:
+#     encoded_password = password.encode("utf-8")
+#     hashed = bcrypt.hashpw(encoded_password, bcrypt.gensalt(10))
+#     # Return as a string so SQLAlchemy/asyncpg doesn't crash expecting a VARCHAR
+#     return hashed.decode('utf-8')
 
 
-def verify_hash_password(password: str, hashed: str):
-    return password_context.verify(password, hashed)
+# def verify_hash_password(password: str, hashed: str) -> bool:
+#     # bcrypt.checkpw requires bytes for both arguments
+#     return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
 
+
+
+def hash_password(password: str) -> str:
+    hashed = bcrypt.hashpw(
+        password.encode("utf-8"),
+        bcrypt.gensalt(10)
+    )
+    return hashed.decode("utf-8")
+
+
+def verify_hash_password(password: str, hashed: str) -> bool:
+    return bcrypt.checkpw(
+        password.encode("utf-8"),
+        hashed.encode("utf-8")
+    )
+
+
+# def generate_passwd_hash(password: str) -> str:
+#     hashed = password_context.hash(password)
+#     return hashed
+
+
+# def verify_password(password: str, hash: str) -> bool:
+#     return password_context.verify(password, hash)
+
+
+
+    
 
 def create_access_token(
     user_data: dict, expiry: timedelta = None, refresh: bool = False
