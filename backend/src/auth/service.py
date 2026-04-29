@@ -19,7 +19,8 @@ class UserService:
         session.add(new_user)
 
         await session.commit()
-
+        await session.refresh(new_user) 
+        print("✅ USER SAVED:", new_user.email, new_user.uid)
         return new_user
 
     async def get_user_by_email(self, email: str, session: AsyncSession):

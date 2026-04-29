@@ -11,10 +11,11 @@ class Role:
         self.allowed_roles = allowed_roles
 
     def __call__(self, current_user: Admin = Depends(get_current_user)):
-        # if not current_user.is_verified:
-        #     raise HTTPException(
-        #         status_code=status.HTTP_403_FORBIDDEN, detail="Account not verified"
-        #     )
+        if not current_user.is_verified:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Account not verified.  your email before continuing.",
+            )
 
         if current_user.role.strip() in self.allowed_roles:
             return True

@@ -9,20 +9,35 @@ from src.db.main import get_session
 from src.db.models import Admin
 
 
-class TokenBearer(HTTPBearer):
+class TokenBearer:
     def __init__(self, auto_error=True):
-        super().__init__(auto_error=auto_error)
+        self.auto_error = auto_error
 
-    async def __call__(self, request: Request) -> HTTPAuthorizationCredentials | None:
-        creds = await super().__call__(request)
-        token = creds.credentials
+    async def __call__(self, request: Request) -> dict | None:
+        # 1. Try to get token from Authorization header
+        auth_header = request.headers.get("Authorization")
+        # print("DEBUG auth_header:", auth_header)
+        token = None
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.split(" ")[1]
+        
+        # 2. Try to get token from cookie
+        # print("DEBUG request.cookies:", request.cookies)
+        if not token:
+            token = request.cookies.get("access_token")
 
+        if not token:
+            # print("DEBUG token is missing!")
+            if self.auto_error:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Not authenticated"
+                )
+            return None
+
+        # decode_token raises a structured HTTPException if the token is
+        # expired or invalid
         token_data = decode_token(token)
-
-        if not self.token_valid(token):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN, detail="Invalid Token"
-            )
 
         if await token_in_blocklist(token_data["jti"]):
             raise HTTPException(
@@ -34,12 +49,7 @@ class TokenBearer(HTTPBearer):
             )
 
         self.verify_token_data(token_data)
-
         return token_data
-
-    def token_valid(self, token: str) -> bool:
-        token_data = decode_token(token)
-        return token_data is not None
 
     def verify_token_data(self, token_data):
         raise NotImplementedError("Please override this method in child classes")
@@ -61,6 +71,34 @@ class RefreshTokenBearer(TokenBearer):
                 status_code=status.HTTP_406_NOT_ACCEPTABLE,
                 detail="Please provide the refresh token",
             )
+
+class RefreshTokenCookie:
+    async def __call__(self, request: Request) -> dict:
+        token = request.cookies.get("refresh_token")
+        if not token:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Refresh token missing from cookies"
+            )
+
+        token_data = decode_token(token)
+
+        if await token_in_blocklist(token_data["jti"]):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "error": "This token is invalid or has been revoked",
+                    "resolution": "Please get a new token",
+                },
+            )
+
+        if not token_data["refresh"]:
+            raise HTTPException(
+                status_code=status.HTTP_406_NOT_ACCEPTABLE,
+                detail="Please provide the refresh token",
+            )
+            
+        return token_data
 
 
 async def get_current_user(

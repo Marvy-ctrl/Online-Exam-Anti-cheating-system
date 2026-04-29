@@ -1,35 +1,20 @@
 from src.config import Config
-from passlib.context import CryptContext
-from itsdangerous import URLSafeTimedSerializer
 from datetime import timedelta, datetime, timezone
 from fastapi import status
 from fastapi.exceptions import HTTPException
+from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
 import jwt
 import uuid
 import bcrypt
 
+
 ACCESS_TOKEN_EXPIRY = 3600
-
-password_context = CryptContext(schemes=["bcrypt"])
-
-
-# def hash_password(password: str) -> str:
-#     encoded_password = password.encode("utf-8")
-#     hashed = bcrypt.hashpw(encoded_password, bcrypt.gensalt(10))
-#     # Return as a string so SQLAlchemy/asyncpg doesn't crash expecting a VARCHAR
-#     return hashed.decode('utf-8')
-
-
-# def verify_hash_password(password: str, hashed: str) -> bool:
-#     # bcrypt.checkpw requires bytes for both arguments
-#     return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
-
 
 
 def hash_password(password: str) -> str:
     hashed = bcrypt.hashpw(
         password.encode("utf-8"),
-        bcrypt.gensalt(10)
+        bcrypt.gensalt(10),
     )
     return hashed.decode("utf-8")
 
@@ -37,32 +22,18 @@ def hash_password(password: str) -> str:
 def verify_hash_password(password: str, hashed: str) -> bool:
     return bcrypt.checkpw(
         password.encode("utf-8"),
-        hashed.encode("utf-8")
+        hashed.encode("utf-8"),
     )
 
 
-# def generate_passwd_hash(password: str) -> str:
-#     hashed = password_context.hash(password)
-#     return hashed
-
-
-# def verify_password(password: str, hash: str) -> bool:
-#     return password_context.verify(password, hash)
-
-
-
-    
-
 def create_access_token(
     user_data: dict, expiry: timedelta = None, refresh: bool = False
-):
-
+) -> str:
     payload = {}
     payload["user"] = user_data
     payload["exp"] = datetime.now(timezone.utc) + (
         expiry if expiry is not None else timedelta(seconds=ACCESS_TOKEN_EXPIRY)
     )
-
     payload["jti"] = str(uuid.uuid4())
     payload["refresh"] = refresh
 
@@ -96,16 +67,35 @@ def decode_token(token: str) -> dict:
         )
 
 
+# URLSafeTimedSerializer tracks token creation time so max_age can be enforced on decode.
 serializer = URLSafeTimedSerializer(
     secret_key=Config.JWT_SECRET, salt="email-verification"
 )
 
 
-def create_url_safe_token(data: dict):
-    token = serializer.dumps(data)
-    return token
+def create_url_safe_token(data: dict) -> str:
+    return serializer.dumps(data)
 
 
-def decode_url_safe_token(token: str):
-    token_data = serializer.loads(token)
-    return token_data
+def decode_url_safe_token(token: str, max_age: int = ACCESS_TOKEN_EXPIRY) -> dict:
+    """
+    Decode a URL-safe timed token.
+    Raises structured HTTP 400 errors on expiry or tampering —
+    never leaks a raw exception to the client.
+
+    Args:
+        token:   The URL-safe token string.
+        max_age: Token validity window in seconds. Defaults to ACCESS_TOKEN_EXPIRY (1 hour).
+    """
+    try:
+        return serializer.loads(token, max_age=max_age)
+    except SignatureExpired:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This link has expired. Please request a new one.",
+        )
+    except BadSignature:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or tampered link. Please request a new one.",
+        )

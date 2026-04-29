@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 from typing import List, Optional
-from sqlmodel import SQLModel, Field, Column, Relationship
+from sqlmodel import SQLModel, Field, Column, Relationship, UniqueConstraint
 from sqlalchemy import Column, Float
 from sqlalchemy.dialects.postgresql import JSON
 import sqlalchemy.dialects.postgresql as pg
@@ -32,11 +32,129 @@ class Admin(SQLModel, table=True):
     )
     updated_at: datetime = Field(
         sa_column=Column(
+            TIMESTAMP(timezone=True),
+            default=lambda: datetime.now(timezone.utc),
+            onupdate=lambda: datetime.now(timezone.utc),
+        )
+    )
+    exams: List["Exam"] = Relationship(
+        back_populates="admin",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
+    institutions: List["Institution"] = Relationship(
+        back_populates="admin",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
+
+class Institution(SQLModel, table=True):
+    __tablename__ = "institution"
+
+    uid: uuid.UUID = Field(
+        sa_column=Column(
+            pg.UUID, primary_key=True, unique=True, nullable=False, default=uuid.uuid4
+        )
+    )
+    admin_uid: uuid.UUID = Field(sa_column=Column(pg.UUID, ForeignKey("admin.uid")))
+    name: str
+    short_info: Optional[str] = None
+    logo_url: Optional[str] = None
+    
+    created_at: datetime = Field(
+        sa_column=Column(
             TIMESTAMP(timezone=True), default=lambda: datetime.now(timezone.utc)
         )
     )
+    updated_at: datetime = Field(
+        sa_column=Column(
+            TIMESTAMP(timezone=True),
+            default=lambda: datetime.now(timezone.utc),
+            onupdate=lambda: datetime.now(timezone.utc),
+        )
+    )
 
-    exams: List["Exam"] = Relationship(back_populates="admin")
+    admin: "Admin" = Relationship(back_populates="institutions")
+    
+    subjects: List["Subject"] = Relationship(
+        back_populates="institution",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
+    exams: List["Exam"] = Relationship(
+        back_populates="institution",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
+    students: List["Student"] = Relationship(
+        back_populates="institution",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
+
+class Student(SQLModel, table=True):
+    __tablename__ = "student"
+    __table_args__ = (
+        UniqueConstraint("student_id", "institution_uid", name="uq_student_inst"),
+    )
+
+    uid: uuid.UUID = Field(
+        sa_column=Column(
+            pg.UUID, primary_key=True, unique=True, nullable=False, default=uuid.uuid4
+        )
+    )
+    institution_uid: uuid.UUID = Field(
+        sa_column=Column(pg.UUID, ForeignKey("institution.uid"))
+    )
+    first_name: str
+    last_name: str
+    email: str
+    student_id: str
+
+    created_at: datetime = Field(
+        sa_column=Column(
+            TIMESTAMP(timezone=True), default=lambda: datetime.now(timezone.utc)
+        )
+    )
+    updated_at: datetime = Field(
+        sa_column=Column(
+            TIMESTAMP(timezone=True),
+            default=lambda: datetime.now(timezone.utc),
+            onupdate=lambda: datetime.now(timezone.utc),
+        )
+    )
+
+    institution: "Institution" = Relationship(back_populates="students")
+    enrollments: List["ExamEnrollment"] = Relationship(back_populates="student_profile")
+    subject_enrollments: List["SubjectEnrollment"] = Relationship(
+        back_populates="student",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
+
+
+
+
+    # class Admin(SQLModel, table=True):
+    # __tablename__ = "admin"
+
+    # uid: uuid.UUID = Field(
+    #     default_factory=uuid.uuid4,
+    #     primary_key=True
+    # )
+
+    # first_name: str
+    # last_name: str
+    # email: str = Field(unique=True, index=True)
+    # password: str
+    # role: str = "admin"
+    # is_verified: bool = False
+
+    # created_at: datetime = Field(
+    #     default_factory=lambda: datetime.now(timezone.utc)
+    # )
+    # updated_at: datetime = Field(
+    #     default_factory=lambda: datetime.now(timezone.utc)
+    # )
+
+    # exams: List["Exam"] = Relationship(
+    #     back_populates="admin",
+    #     sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    # )
 
 
 class Subject(SQLModel, table=True):
@@ -47,9 +165,47 @@ class Subject(SQLModel, table=True):
             pg.UUID, primary_key=True, unique=True, nullable=False, default=uuid.uuid4
         )
     )
+    institution_uid: uuid.UUID = Field(
+        sa_column=Column(pg.UUID, ForeignKey("institution.uid"))
+    )
     name: str
 
-    exams: List["Exam"] = Relationship(back_populates="subject")
+    institution: "Institution" = Relationship(back_populates="subjects")
+    exams: List["Exam"] = Relationship(
+        back_populates="subject",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
+    enrolled_students: List["SubjectEnrollment"] = Relationship(
+        back_populates="subject",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
+    updated_at: datetime = Field(
+        sa_column=Column(
+            TIMESTAMP(timezone=True),
+            default=lambda: datetime.now(timezone.utc),
+            onupdate=lambda: datetime.now(timezone.utc),
+        )
+    )
+
+class SubjectEnrollment(SQLModel, table=True):
+    __tablename__ = "subject_enrollment"
+    uid: uuid.UUID = Field(
+        sa_column=Column(
+            pg.UUID, primary_key=True, unique=True, nullable=False, default=uuid.uuid4
+        )
+    )
+    subject_uid: uuid.UUID = Field(sa_column=Column(pg.UUID, ForeignKey("subject.uid")))
+    student_uid: uuid.UUID = Field(sa_column=Column(pg.UUID, ForeignKey("student.uid")))
+    
+    created_at: datetime = Field(
+        sa_column=Column(
+            TIMESTAMP(timezone=True), default=lambda: datetime.now(timezone.utc)
+        )
+    )
+
+    subject: "Subject" = Relationship(back_populates="enrolled_students")
+    student: "Student" = Relationship(back_populates="subject_enrollments")
+
 
 
 class Exam(SQLModel, table=True):
@@ -61,6 +217,9 @@ class Exam(SQLModel, table=True):
         )
     )
     admin_uid: uuid.UUID = Field(sa_column=Column(pg.UUID, ForeignKey("admin.uid")))
+    institution_uid: uuid.UUID = Field(
+        sa_column=Column(pg.UUID, ForeignKey("institution.uid"))
+    )
     subject_uid: Optional[uuid.UUID] = Field(
         sa_column=Column(pg.UUID, ForeignKey("subject.uid"))
     )
@@ -95,15 +254,30 @@ class Exam(SQLModel, table=True):
 
     updated_at: datetime = Field(
         sa_column=Column(
-            TIMESTAMP(timezone=True), default=lambda: datetime.now(timezone.utc)
+            TIMESTAMP(timezone=True),
+            default=lambda: datetime.now(timezone.utc),
+            onupdate=lambda: datetime.now(timezone.utc),
         )
     )
 
     admin: "Admin" = Relationship(back_populates="exams")
+    institution: "Institution" = Relationship(back_populates="exams")
     subject: Optional["Subject"] = Relationship(back_populates="exams")
-    questions: List["Question"] = Relationship(back_populates="exam")
-    enrollments: List["ExamEnrollment"] = Relationship(back_populates="exam")
-    sessions: List["ExamSession"] = Relationship(back_populates="exam")
+
+    questions: List["Question"] = Relationship(
+        back_populates="exam",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
+
+    enrollments: List["ExamEnrollment"] = Relationship(
+        back_populates="exam",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
+
+    sessions: List["ExamSession"] = Relationship(
+        back_populates="exam",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
 
 
 class ExamEnrollmentStatus(str, Enum):
@@ -119,6 +293,10 @@ class ExamEnrollment(SQLModel, table=True):
         )
     )
     exam_uid: uuid.UUID = Field(sa_column=Column(pg.UUID, ForeignKey("exam.uid")))
+    student_uid: Optional[uuid.UUID] = Field(
+        default=None,
+        sa_column=Column(pg.UUID, ForeignKey("student.uid", ondelete="SET NULL"))
+    )
     first_name: str
     last_name: str
     email: str = Field(index=True)
@@ -150,14 +328,29 @@ class ExamEnrollment(SQLModel, table=True):
     )
     updated_at: datetime = Field(
         sa_column=Column(
-            TIMESTAMP(timezone=True), default=lambda: datetime.now(timezone.utc)
+            TIMESTAMP(timezone=True),
+            default=lambda: datetime.now(timezone.utc),
+            onupdate=lambda: datetime.now(timezone.utc),
         )
     )
 
+    student_profile: Optional["Student"] = Relationship(back_populates="enrollments")
     exam: "Exam" = Relationship(back_populates="enrollments")
-    sessions: List["ExamSession"] = Relationship(back_populates="enrollment")
-    snapshots: List["Snapshot"] = Relationship(back_populates="enrollment")
-    violations: List["Violation"] = Relationship(back_populates="student")
+
+    sessions: List["ExamSession"] = Relationship(
+        back_populates="enrollment",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
+
+    snapshots: List["Snapshot"] = Relationship(
+        back_populates="enrollment",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
+
+    violations: List["Violation"] = Relationship(
+        back_populates="student",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
 
 
 class Question(SQLModel, table=True):
@@ -183,7 +376,10 @@ class Question(SQLModel, table=True):
     )
 
     exam: "Exam" = Relationship(back_populates="questions")
-    options: List["Options"] = Relationship(back_populates="question")
+    options: List["Options"] = Relationship(
+        back_populates="question",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
 
 
 class Options(SQLModel, table=True):
@@ -239,12 +435,23 @@ class ExamSession(SQLModel, table=True):
             default=ExamStatus.not_started,
         ),
     )
-
     enrollment: "ExamEnrollment" = Relationship(back_populates="sessions")
     exam: "Exam" = Relationship(back_populates="sessions")
-    answers: List["StudentAnswers"] = Relationship(back_populates="session")
-    snapshots: List["Snapshot"] = Relationship(back_populates="session")
-    violations: List["Violation"] = Relationship(back_populates="session")
+
+    answers: List["StudentAnswers"] = Relationship(
+        back_populates="session",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
+
+    snapshots: List["Snapshot"] = Relationship(
+        back_populates="session",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
+
+    violations: List["Violation"] = Relationship(
+        back_populates="session",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
 
 
 class StudentAnswers(SQLModel, table=True):

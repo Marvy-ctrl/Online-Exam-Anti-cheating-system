@@ -58,3 +58,20 @@ async def student_enroll(
     )
 
     return enrollment_record
+
+@student_router.get(
+    "/enroll/{token}/validate",
+    status_code=status.HTTP_200_OK,
+)
+async def validate_enrollment_link(
+    token: str,
+    session: AsyncSession = Depends(get_session),
+):
+    """
+    Validate if the enrollment link is active before showing the form.
+    """
+    exam_uid = await student_service.verify_enrollment_link(
+        token=token,
+        session=session,
+    )
+    return {"valid": True, "exam_uid": exam_uid}

@@ -17,14 +17,7 @@ exam_service = ExamService()
 
 
 class StudentService:
-    async def enroll_student(
-        self,
-        token: str,
-        enrollment_input: StudentEnrollModel,
-        client_ip: str,
-        session: AsyncSession,
-    ):
-
+    async def verify_enrollment_link(self, token: str, session: AsyncSession):
         try:
             token_data = decode_url_safe_token(token)
             exam_uid = token_data.get("exam_uid")
@@ -58,6 +51,17 @@ class StudentService:
 
         if end and now > end:
             raise HTTPException(400, "Enrollment link has expired")
+            
+        return exam_uid
+
+    async def enroll_student(
+        self,
+        token: str,
+        enrollment_input: StudentEnrollModel,
+        client_ip: str,
+        session: AsyncSession,
+    ):
+        exam_uid = await self.verify_enrollment_link(token, session)
 
         statement = select(ExamEnrollment).where(
             ExamEnrollment.exam_uid == exam_uid,
@@ -81,6 +85,12 @@ class StudentService:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="This student has already enrolled on another device",
+            )
+
+        if enrollment_record.status == "enrolled":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You have already completed face registration. You cannot re-enroll or change your face.",
             )
 
         enrollment_record.device_id = (
@@ -172,6 +182,12 @@ class StudentService:
                 status_code=status.HTTP_404_NOT_FOUND, detail="Enrollment not found"
             )
 
+        if enrollment_record.status == "enrolled":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Face registration is already complete for this enrollment.",
+            )
+
         # 6. Update enrollment record with face embedding
         enrollment_record.embedding_vector = face_embedding
         enrollment_record.updated_at = datetime.now()
@@ -184,6 +200,7 @@ class StudentService:
         return {
             "message": "Face registered successfully",
             "enrollment_uid": enrollment_uid,
+            "exam_uid": enrollment_record.exam_uid,
             "face_registered": True,
             "embedding_vector_length": len(face_embedding),
         }
