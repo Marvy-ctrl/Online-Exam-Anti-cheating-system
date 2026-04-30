@@ -70,10 +70,12 @@ class ExamService:
         await session.commit()
         return {"message": "Subject deleted successfully"}
 
-    async def get_all_subjects(self, session: AsyncSession, institution_uid: str, admin_uid: str):
-        # Only fetch subjects belonging to the given institution, validating the admin owns it.
-        # This prevents an admin from seeing subjects in an institution they don't own.
-        statement = select(Subject).where(Subject.institution_uid == institution_uid).order_by(Subject.name)
+    async def get_all_subjects(self, session: AsyncSession, admin_uid: str, institution_uid: str = None):
+        from src.db.models import Institution
+        statement = select(Subject).join(Institution).where(Institution.admin_uid == admin_uid)
+        if institution_uid:
+            statement = statement.where(Subject.institution_uid == institution_uid)
+        statement = statement.order_by(Subject.name)
         result = await session.exec(statement)
         return result.all()
 
@@ -217,12 +219,14 @@ class ExamService:
         await session.refresh(new_exam)
         return new_exam
 
-    async def get_all_exams(self, session: AsyncSession, admin_uid: str, institution_uid: str = None):
-        """Return exams belonging to the requesting examiner, optionally filtered by institution_uid."""
+    async def get_all_exams(self, session: AsyncSession, admin_uid: str, institution_uid: str = None, subject_uid: str = None):
+        """Return exams belonging to the requesting examiner, optionally filtered by institution_uid or subject_uid."""
         statement = select(Exam).where(Exam.admin_uid == admin_uid)
         
         if institution_uid:
             statement = statement.where(Exam.institution_uid == institution_uid)
+        if subject_uid:
+            statement = statement.where(Exam.subject_uid == subject_uid)
             
         statement = statement.order_by(desc(Exam.created_at))
         

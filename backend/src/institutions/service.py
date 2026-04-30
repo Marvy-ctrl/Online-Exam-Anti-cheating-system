@@ -1,6 +1,7 @@
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import select, desc
-from src.db.models import Institution
+from sqlmodel import select, desc, func
+from src.db.models import Institution, Exam, Student, ExamSession, Violation
+from datetime import datetime, timezone
 from uuid import UUID
 from .schema import InstitutionCreateModel
 
@@ -41,3 +42,41 @@ class InstitutionService:
         await session.delete(institution)
         await session.commit()
         return True
+
+    async def get_dashboard_overview(self, session: AsyncSession, admin_uid: str):
+        # 1. Institutions count
+        inst_stmt = select(func.count(Institution.uid)).where(Institution.admin_uid == admin_uid)
+        institutions_count = (await session.exec(inst_stmt)).one()
+
+        # 2. Active Exams count
+        now = datetime.now(timezone.utc)
+        exams_stmt = select(func.count(Exam.uid)).where(
+            Exam.admin_uid == admin_uid,
+            Exam.start_time <= now,
+            Exam.end_time >= now
+        )
+        active_exams_count = (await session.exec(exams_stmt)).one()
+
+        # 3. Total Students count
+        students_stmt = (
+            select(func.count(Student.uid))
+            .join(Institution)
+            .where(Institution.admin_uid == admin_uid)
+        )
+        total_students_count = (await session.exec(students_stmt)).one()
+
+        # 4. Violations Detected count
+        violations_stmt = (
+            select(func.count(Violation.uid))
+            .join(ExamSession)
+            .join(Exam)
+            .where(Exam.admin_uid == admin_uid)
+        )
+        violations_detected_count = (await session.exec(violations_stmt)).one()
+
+        return {
+            "institutions_count": institutions_count,
+            "active_exams_count": active_exams_count,
+            "total_students_count": total_students_count,
+            "violations_detected_count": violations_detected_count,
+        }

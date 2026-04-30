@@ -10,7 +10,8 @@ import {
   Users, 
   Settings, 
   LogOut,
-  ShieldCheck
+  ShieldCheck,
+  X
 } from 'lucide-react'
 import { apiFetch } from '@/src/lib/api'
 
@@ -23,7 +24,12 @@ const navItems = [
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
 ]
 
-export default function Sidebar() {
+interface SidebarProps {
+  isOpen?: boolean;
+  onClose?: () => void;
+}
+
+export default function Sidebar({ isOpen = false, onClose = () => {} }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
 
@@ -37,15 +43,36 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="w-64 bg-[#0f172a] text-slate-300 flex flex-col h-full border-r border-slate-800 shrink-0 shadow-2xl">
+    <>
+      {/* Mobile Backdrop */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 lg:hidden"
+          onClick={onClose}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside className={`
+        fixed lg:static inset-y-0 left-0 z-50 w-64 bg-[#0f172a] text-slate-300 flex flex-col h-full border-r border-slate-800 shrink-0 shadow-2xl
+        transition-transform duration-300 ease-in-out
+        ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+      `}>
       {/* Brand area */}
-      <div className="h-16 flex items-center px-6 border-b border-slate-800">
+      <div className="h-16 flex items-center justify-between px-6 border-b border-slate-800">
         <div className="flex items-center gap-2 text-white font-bold tracking-tight">
           <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
             <ShieldCheck size={18} className="text-white" />
           </div>
           <span>ExamGuard</span>
         </div>
+        
+        <button 
+          onClick={onClose}
+          className="lg:hidden p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+        >
+          <X size={20} />
+        </button>
       </div>
 
       {/* Navigation */}
@@ -65,6 +92,7 @@ export default function Sidebar() {
             <Link 
               key={item.name} 
               href={item.href}
+              onClick={onClose}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition-all duration-200 group ${
                 isActive 
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-600/10' 
@@ -92,5 +120,6 @@ export default function Sidebar() {
         </button>
       </div>
     </aside>
+    </>
   )
 }

@@ -48,14 +48,27 @@ async def create_subject(
 
 @exam_router.get("/subjects", response_model=list[SubjectResponseModel])
 async def get_all_subjects(
-    institution_uid: str,
+    session: AsyncSession = Depends(get_session),
+    token_details: dict = Depends(access_token_bearer),
+    admin_only=Depends(role),
+    institution_uid: str = None,
+):
+    admin_uid = str(token_details.get("user")["uid"])
+    subjects = await exam_service.get_all_subjects(session, admin_uid, institution_uid)
+    return subjects
+
+@exam_router.get("/subject/{subject_uid}", response_model=SubjectResponseModel)
+async def get_subject(
+    subject_uid: str,
     session: AsyncSession = Depends(get_session),
     token_details: dict = Depends(access_token_bearer),
     admin_only=Depends(role),
 ):
     admin_uid = str(token_details.get("user")["uid"])
-    subjects = await exam_service.get_all_subjects(session, institution_uid, admin_uid)
-    return subjects
+    subject = await exam_service.get_subject_owned_by(subject_uid, admin_uid, session)
+    if not subject:
+        raise HTTPException(status_code=404, detail="Subject not found")
+    return subject
 
 @exam_router.patch("/update_subject/{subject_uid}", response_model=SubjectResponseModel)
 async def update_subject(
@@ -137,10 +150,11 @@ async def get_all_exams(
     session: AsyncSession = Depends(get_session),
     token_details: dict = Depends(access_token_bearer),
     admin_only=Depends(role),
-    institution_uid: str = None
+    institution_uid: str = None,
+    subject_uid: str = None
 ):
     admin_uid = str(token_details.get("user")["uid"])
-    exams = await exam_service.get_all_exams(session, admin_uid, institution_uid)
+    exams = await exam_service.get_all_exams(session, admin_uid, institution_uid, subject_uid)
     return exams
 
 

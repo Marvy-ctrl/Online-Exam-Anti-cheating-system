@@ -18,3 +18,9 @@ class InstitutionResponseModel(BaseModel):
     updated_at: datetime
     
     model_config = ConfigDict(from_attributes=True)
+
+class OverviewResponseModel(BaseModel):
+    institutions_count: int
+    active_exams_count: int
+    total_students_count: int
+    violations_detected_count: int

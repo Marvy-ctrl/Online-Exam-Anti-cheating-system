@@ -307,11 +307,11 @@ export default function InstitutionWorkspace() {
             ) : (
               <ul className="divide-y divide-slate-100">
                 {subjects.map((sub: Subject) => (
-                  <li key={sub.uid} className="py-3 flex items-center justify-between group hover:bg-gray-50">
-                    <div className="flex items-center gap-3 ">
-                      <BookOpen size={16} className="text-blue-500" />
-                      <span className="font-medium text-slate-700">{sub.name}</span>
-                    </div>
+                  <li key={sub.uid} className="py-3 flex items-center justify-between group hover:bg-gray-50 px-2 rounded-lg">
+                    <Link href={`/dashboard/institutions/${id}/subjects/${sub.uid}`} className="flex items-center gap-3 flex-1 group/link">
+                      <BookOpen size={16} className="text-blue-500 group-hover/link:text-blue-600" />
+                      <span className="font-medium text-slate-700 group-hover/link:text-blue-600 transition-colors">{sub.name}</span>
+                    </Link>
                     <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button 
                         onClick={() => handleEditSubject(sub)}

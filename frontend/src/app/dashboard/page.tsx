@@ -1,8 +1,36 @@
 "use client"
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { Activity, ShieldAlert, GraduationCap, Building2 } from 'lucide-react'
+import { apiFetch } from '@/src/lib/api'
+
+interface DashboardOverview {
+  institutions_count: number;
+  active_exams_count: number;
+  total_students_count: number;
+  violations_detected_count: number;
+}
 
 export default function Dashboard() {
+  const [overview, setOverview] = useState<DashboardOverview | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchOverview = async () => {
+      try {
+        const res = await apiFetch("/institutions/dashboard/overview");
+        if (res.ok) {
+          const data = await res.json();
+          setOverview(data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch dashboard overview:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchOverview();
+  }, []);
+
   return (
     <div className="p-8 max-w-7xl mx-auto w-full">
       <div className="mb-10">
@@ -18,7 +46,9 @@ export default function Dashboard() {
               <Building2 size={20} />
             </div>
           </div>
-          <p className="text-3xl text-slate-900 font-bold mb-1">0</p>
+          <p className="text-3xl text-slate-900 font-bold mb-1">
+            {loading ? "..." : overview?.institutions_count ?? 0}
+          </p>
           <h3 className="font-medium text-slate-500 text-sm">Institutions</h3>
         </div>
 
@@ -32,7 +62,9 @@ export default function Dashboard() {
               <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
             </span>
           </div>
-          <p className="text-3xl text-slate-900 font-bold mb-1">0</p>
+          <p className="text-3xl text-slate-900 font-bold mb-1">
+            {loading ? "..." : overview?.active_exams_count ?? 0}
+          </p>
           <h3 className="font-medium text-slate-500 text-sm">Active Exams</h3>
         </div>
 
@@ -42,7 +74,9 @@ export default function Dashboard() {
               <GraduationCap size={20} />
             </div>
           </div>
-          <p className="text-3xl text-slate-900 font-bold mb-1">0</p>
+          <p className="text-3xl text-slate-900 font-bold mb-1">
+            {loading ? "..." : overview?.total_students_count ?? 0}
+          </p>
           <h3 className="font-medium text-slate-500 text-sm">Total Students</h3>
         </div>
         
@@ -53,7 +87,9 @@ export default function Dashboard() {
               <ShieldAlert size={20} />
             </div>
           </div>
-          <p className="text-3xl text-slate-900 font-bold mb-1 relative z-10">0</p>
+          <p className="text-3xl text-slate-900 font-bold mb-1 relative z-10">
+            {loading ? "..." : overview?.violations_detected_count ?? 0}
+          </p>
           <h3 className="font-medium text-slate-500 text-sm relative z-10">Violations Detected</h3>
         </div>
       </div>

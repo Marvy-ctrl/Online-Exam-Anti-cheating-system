@@ -6,7 +6,7 @@ from src.db.main import get_session
 from src.auth.dependencies import AccessTokenBearer
 from src.dependencies.roles import Role
 from .service import InstitutionService
-from .schema import InstitutionCreateModel, InstitutionResponseModel
+from .schema import InstitutionCreateModel, InstitutionResponseModel, OverviewResponseModel
 from src.config import Config
 import cloudinary
 import cloudinary.uploader
@@ -49,6 +49,17 @@ async def get_my_institutions(
     admin_uid = str(token_details.get("user")["uid"])
     institutions = await institution_service.get_all_institutions(session, admin_uid)
     return institutions
+
+
+@institution_router.get("/dashboard/overview", response_model=OverviewResponseModel)
+async def get_dashboard_overview(
+    session: AsyncSession = Depends(get_session),
+    token_details: dict = Depends(access_token_bearer),
+    admin_only=Depends(role),
+):
+    admin_uid = str(token_details.get("user")["uid"])
+    overview = await institution_service.get_dashboard_overview(session, admin_uid)
+    return overview
 
 
 @institution_router.get("/{institution_uid}", response_model=InstitutionResponseModel)
