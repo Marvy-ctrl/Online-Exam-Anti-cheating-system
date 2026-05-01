@@ -6,18 +6,22 @@ from .schema import (
     UserCreateModel,
     UserLoginModel,
     UserresponseModel,
+    ChangePasswordModel,
+    ForgotPasswordModel,
+    PasswordResetModel
 )
 from src.db.main import get_session
 from src.auth.service import UserService
 from src.dependencies.roles import Role
 from .utils import (
+    hash_password,
     verify_hash_password,
     create_access_token,
     create_url_safe_token,
     decode_url_safe_token,
 )
 from .dependencies import AccessTokenBearer, RefreshTokenBearer, RefreshTokenCookie, get_current_user
-from .email import send_verification_email
+from .email import send_verification_email, send_password_reset_email
 from datetime import timedelta
 
 access_token_bearer = AccessTokenBearer()
@@ -215,3 +219,103 @@ async def logout():
     response.delete_cookie("access_token", path="/")
     response.delete_cookie("refresh_token", path="/")
     return response
+
+
+@auth_router.post("/change-password")
+async def change_password(
+    details: ChangePasswordModel,
+    session: AsyncSession = Depends(get_session),
+    user = Depends(get_current_user)
+):
+    """
+    Change the authenticated user's password.
+    """
+    if details.new_password != details.confirm_new_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New passwords do not match."
+        )
+
+    correct_password = verify_hash_password(details.current_password, user.password)
+    if not correct_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Incorrect current password."
+        )
+
+    user.password = hash_password(details.new_password)
+    session.add(user)
+    await session.commit()
+
+    return JSONResponse(
+        content={
+            "success": True,
+            "data": {"message": "Password changed successfully."},
+            "error": None,
+            "meta": {}
+        }
+    )
+
+@auth_router.post("/forget-password")
+async def forget_password(
+    details: ForgotPasswordModel,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_session),
+):
+    email = details.email
+    user = await user_service.get_user_by_email(email, session)
+    
+    if user:
+        token = create_url_safe_token({"email": email})
+        background_tasks.add_task(send_password_reset_email, email, token)
+
+    return JSONResponse(
+        content={
+            "success": True,
+            "data": {"message": "A password reset link has been sent."},
+            "error": None,
+            "meta": {}
+        }
+    )
+
+
+@auth_router.post("/reset-password")
+async def reset_password(
+    details: PasswordResetModel,
+    session: AsyncSession = Depends(get_session),
+):
+    if details.new_password != details.confirm_new_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New passwords do not match."
+        )
+
+    # Decode token raises HTTP 400 if expired or invalid
+    token_data = decode_url_safe_token(details.token)
+    email = token_data.get("email")
+
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid reset token."
+        )
+
+    user = await user_service.get_user_by_email(email, session)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Account not found."
+        )
+
+    user.password = hash_password(details.new_password)
+    session.add(user)
+    await session.commit()
+
+    return JSONResponse(
+        content={
+            "success": True,
+            "data": {"message": "Password has been successfully reset. You can now log in."},
+            "error": None,
+            "meta": {}
+        }
+    )

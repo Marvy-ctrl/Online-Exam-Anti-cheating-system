@@ -30,3 +30,17 @@ class UserresponseModel(BaseModel):
     is_verified: bool
     created_at: datetime
     updated_at: datetime
+
+
+class ChangePasswordModel(BaseModel):
+    current_password: str
+    new_password: str
+    confirm_new_password: str
+
+class ForgotPasswordModel(BaseModel):
+    email: EmailStr
+
+class PasswordResetModel(BaseModel):
+    token: str
+    new_password: str
+    confirm_new_password: str

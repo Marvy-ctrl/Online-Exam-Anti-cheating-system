@@ -128,7 +128,9 @@ export async function apiFetch(
   // 🔁 HANDLE AUTH FAILURE
   if (
     (res.status === 401 || res.status === 403) &&
-    !endpoint.includes("/auth/refresh_token")
+    !endpoint.includes("/auth/refresh_token") &&
+    !endpoint.includes("/auth/login") &&
+    !endpoint.includes("/auth/register")
   ) {
     if (!isRefreshing) {
       isRefreshing = true;

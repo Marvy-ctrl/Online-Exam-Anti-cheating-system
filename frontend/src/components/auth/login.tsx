@@ -106,7 +106,7 @@ export default function Loginform() {
                 <label className="block text-xs font-bold text-slate-700  tracking-wider">
                   Password
                 </label>
-                <Link href="#" className="text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors">
+                <Link href="/forget-password" className="text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors">
                   Reset password
                 </Link>
               </div>

@@ -98,3 +98,37 @@ def send_exam_invitation_email(to_email: str, exam_title: str, enrollment_url: s
     </html>
     """
     send_email(to_email, f"Invitation: {exam_title}", html)
+
+def send_password_reset_email(to_email: str, token: str) -> None:
+    """
+    Send a password reset email.
+    The token is a URL-safe timed token.
+    """
+    reset_url = f"{Config.FRONTEND_URL}/reset-password?token={token}"
+
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #1a1a2e;">
+        <h2>Reset Your Password</h2>
+        <p>You requested a password reset. Click the button below to set a new password.</p>
+        <a href="{reset_url}"
+           style="display: inline-block; padding: 12px 24px; background-color: 2563EB;
+                  color: white; text-decoration: none; border-radius: 6px; margin: 16px 0;">
+            Reset Password
+        </a>
+        <p style="color: #666; font-size: 14px;">This link expires in <strong>1 hour</strong>.</p>
+        <p style="color: #666; font-size: 14px;">
+            If you did not request a password reset, you can safely ignore this email.
+        </p>
+    </body>
+    </html>
+    """
+    try:
+        send_email(to_email, "Reset your ExamGuard Password", html)
+    except ValueError:
+        print("\n\n" + "="*50)
+        print("🚨 MANUALLY RESET YOUR PASSWORD TO CONTINUE 🚨")
+        print("Click this link since your network blocked the email:")
+        print("RESET LINK:", reset_url)
+        print("="*50 + "\n\n")
