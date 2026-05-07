@@ -11,12 +11,14 @@ import {
   Settings, 
   LogOut,
   ShieldCheck,
+  BarChart3,
   X
 } from 'lucide-react'
 import { apiFetch } from '@/src/lib/api'
 
 const navItems = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { name: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
   { name: 'Institutions', href: '/dashboard/institutions', icon: Building2 },
   { name: 'Subjects', href: '/dashboard/subjects', icon: BookOpen },
   { name: 'Exams', href: '/dashboard/exams', icon: FileText },

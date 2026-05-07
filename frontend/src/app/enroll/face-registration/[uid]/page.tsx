@@ -101,11 +101,16 @@ export default function FaceRegistrationPage() {
       if (res.ok) {
         const data = await res.json()
         if (data.exam_uid) {
+          // Track enrolled exams list
           const enrolledExams = JSON.parse(localStorage.getItem('enrolled_exams') || '[]')
           if (!enrolledExams.includes(data.exam_uid)) {
             enrolledExams.push(data.exam_uid)
             localStorage.setItem('enrolled_exams', JSON.stringify(enrolledExams))
           }
+          // Map exam_uid → enrollment_uid so the exam entry gate can find the student
+          const enrolledMap = JSON.parse(localStorage.getItem('enrolled_exams_map') || '{}')
+          enrolledMap[data.exam_uid] = enrollmentUid
+          localStorage.setItem('enrolled_exams_map', JSON.stringify(enrolledMap))
         }
         setSuccess(true)
       } else {

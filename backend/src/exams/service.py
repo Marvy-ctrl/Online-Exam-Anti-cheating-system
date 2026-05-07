@@ -18,8 +18,18 @@ from src.db.models import (
 from sqlmodel.ext.asyncio.session import AsyncSession
 from uuid import UUID
 from sqlmodel import select, desc, and_
-from datetime import timezone, datetime
+from datetime import timezone, datetime, timedelta
 import uuid
+
+WAT = timezone(timedelta(hours=1))
+
+def ensure_utc(dt: datetime) -> datetime:
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        # Assume naive input from frontend is in local (WAT)
+        dt = dt.replace(tzinfo=WAT)
+    return dt.astimezone(timezone.utc)
 
 
 class ExamService:
@@ -212,6 +222,10 @@ class ExamService:
         exam_dict = exam.model_dump()
         # admin_uid is always set from the authenticated token, never from client input.
         exam_dict["admin_uid"] = UUID(admin_uid)
+        
+        # Ensure times are correctly handled
+        exam_dict["start_time"] = ensure_utc(exam_dict.get("start_time"))
+        exam_dict["end_time"] = ensure_utc(exam_dict.get("end_time"))
 
         new_exam = Exam(**exam_dict)
         session.add(new_exam)
@@ -247,6 +261,8 @@ class ExamService:
 
         update_data_dict = update_data.model_dump()
         for key, value in update_data_dict.items():
+            if key in ["start_time", "end_time"] and isinstance(value, datetime):
+                value = ensure_utc(value)
             setattr(exam_to_update, key, value)
 
         # Single commit after all fields are set — prevents partial writes.
@@ -313,6 +329,28 @@ class ExamService:
             return False
             
         await session.delete(enrollment)
+        await session.commit()
+        return True
+
+    async def bulk_remove_students_from_exam(self, session: AsyncSession, exam_uid: str, student_uids: list[str], admin_uid: str):
+        from src.db.models import ExamEnrollment
+        # Verify exam ownership first
+        exam = await self.get_exam_owned_by(exam_uid, admin_uid, session)
+        if not exam:
+            return False
+            
+        statement = select(ExamEnrollment).where(
+            and_(
+                ExamEnrollment.exam_uid == exam_uid, 
+                ExamEnrollment.uid.in_(student_uids)
+            )
+        )
+        result = await session.exec(statement)
+        enrollments = result.all()
+        
+        for enrollment in enrollments:
+            await session.delete(enrollment)
+            
         await session.commit()
         return True
 

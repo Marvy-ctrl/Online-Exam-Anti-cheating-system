@@ -32,6 +32,8 @@ class ExamCreateModel(BaseModel):
     start_time: datetime
     end_time: datetime
     description: Optional[str] = None
+    shuffle_questions: bool = False
+    shuffle_options: bool = False
 
 
 class ExamResponseModel(BaseModel):
@@ -44,6 +46,9 @@ class ExamResponseModel(BaseModel):
     description: Optional[str]
     start_time: datetime
     end_time: datetime
+    exam_link: Optional[str] = None
+    shuffle_questions: bool
+    shuffle_options: bool
     created_at: datetime
     updated_at: datetime
 
@@ -66,6 +71,9 @@ class ExamDetailResponseModel(BaseModel):
     enroll_link: Optional[str] = None
     link_start_time: Optional[datetime] = None
     link_end_time: Optional[datetime] = None
+    exam_link: Optional[str] = None
+    shuffle_questions: bool = False
+    shuffle_options: bool = False
 
 
 
@@ -74,6 +82,8 @@ class ExamUpdateModel(BaseModel):
     duration_minutes: int
     start_time: datetime
     end_time: datetime
+    shuffle_questions: Optional[bool] = None
+    shuffle_options: Optional[bool] = None
 
 
 class StudentPreEnrollModel(BaseModel):
@@ -117,3 +127,6 @@ class StudentUpdateModel(BaseModel):
 
 class ExamInvitationModel(BaseModel):
     custom_message: Optional[str] = ""
+
+class BulkUnenrollModel(BaseModel):
+    student_uids: list[str]

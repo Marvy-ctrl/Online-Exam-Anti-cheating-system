@@ -8,7 +8,10 @@ from src.db.models import Question, Options, Exam
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.exams.service import ExamService
 from sqlmodel import select
+from sqlalchemy.orm import selectinload
 from datetime import datetime, timezone
+from sqlalchemy import delete
+from uuid import UUID
 
 exam_service = ExamService()
 
@@ -23,6 +26,7 @@ class QuestionService:
     async def get_all_questions(self, exam_uid: str, session: AsyncSession):
         statement = (
             select(Question)
+            .options(selectinload(Question.options))
             .where(Question.exam_uid == exam_uid)
             .order_by(Question.order_index)
         )
@@ -30,7 +34,7 @@ class QuestionService:
         return result.all()
 
     async def get_a_question(self, question_uid: str, session: AsyncSession):
-        statement = select(Question).where(Question.uid == question_uid)
+        statement = select(Question).options(selectinload(Question.options)).where(Question.uid == question_uid)
         result = await session.exec(statement)
         return result.first()
 
@@ -40,6 +44,7 @@ class QuestionService:
         new_question = Question(
             exam_uid=exam_uid,
             question_text=question_detail.question_text,
+            marks=question_detail.marks,
             order_index=question_detail.order_index,
         )
 
@@ -79,6 +84,8 @@ class QuestionService:
             question_to_update.question_text = update_data_dict["question_text"]
         if "order_index" in update_data_dict:
             question_to_update.order_index = update_data_dict["order_index"]
+        if "marks" in update_data_dict:
+            question_to_update.marks = update_data_dict["marks"]
 
         if "options" in update_data_dict and "correct_answer" in update_data_dict:
             existing_options = await session.exec(
@@ -103,17 +110,48 @@ class QuestionService:
         return question_to_update
 
     async def delete_question(self, question_uid: str, session: AsyncSession):
+        from src.db.models import StudentAnswers
         question_to_delete = await self.get_a_question(question_uid, session)
         if not question_to_delete:
             return None
 
+        # 1. Delete options
         existing_options = await session.exec(
             select(Options).where(Options.question_uid == question_uid)
         )
         for option in existing_options:
             await session.delete(option)
 
+        # 2. Delete student answers
+        existing_answers = await session.exec(
+            select(StudentAnswers).where(StudentAnswers.question_uid == question_uid)
+        )
+        for answer in existing_answers:
+            await session.delete(answer)
+
         await session.delete(question_to_delete)
         await session.commit()
 
         return {"message": "Question deleted successfully"}
+
+
+   
+
+    async def bulk_delete_questions(
+    self,
+    question_uids: list[str],
+    session: AsyncSession
+):
+        question_ids = [UUID(uid) for uid in question_uids]
+
+        await session.exec(
+            delete(Question).where(
+                Question.uid.in_(question_ids)
+            )
+        )
+
+        await session.commit()
+
+        return True
+
+    

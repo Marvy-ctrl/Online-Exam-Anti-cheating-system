@@ -1,5 +1,9 @@
-from fastapi import APIRouter, Depends, status
+import uuid
+from src.auth.dependencies import AccessTokenBearer
+from src.analytics.router import access_token_bearer
+from fastapi import APIRouter, Depends, status, WebSocket, WebSocketDisconnect, BackgroundTasks, HTTPException
 from fastapi.responses import JSONResponse
+from src.websocket import manager
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.db.main import get_session
 from .service import ExamSessionService
@@ -11,8 +15,14 @@ from .schema import (
     ChooseOptionsResponse,
     VerifyFaceRequest,
     VerifyFaceResponse,
+    ExamQuestionsResponse,
+    ExamLinkValidateResponse,
+    IdentifyStudentRequest,
+    ViolationReportRequest,
+    UpdateScoreRequest,
 )
-
+from src.auth.email import send_exam_result_email
+access_token_bearer = AccessTokenBearer()
 exam_session_router = APIRouter()
 session_service = ExamSessionService()
 
@@ -103,3 +113,216 @@ async def verify_face(
         message=result["message"],
         violation_type=result["violation_type"],
     )
+
+
+@exam_session_router.get(
+    "/enter/{token}/validate",
+    response_model=ExamLinkValidateResponse,
+)
+async def validate_exam_link(
+    token: str,
+    session: AsyncSession = Depends(get_session),
+):
+    """
+    Validate an exam entry token. Returns exam timing info and open/not_yet_open/expired status.
+    Unauthenticated — used by the student exam entry gate page.
+    """
+    result = await session_service.validate_exam_link(token=token, session=session)
+    return ExamLinkValidateResponse(**result)
+
+
+@exam_session_router.get(
+    "/{exam_uid}/student/{student_uid}/questions",
+    response_model=ExamQuestionsResponse,
+)
+async def get_exam_questions(
+    exam_uid: str,
+    student_uid: str,
+    session: AsyncSession = Depends(get_session),
+):
+    """
+    Returns all questions + options (is_correct stripped) for an active student session.
+    Also returns saved_answers dict for reconnect/power-loss recovery.
+    student_uid = enrollment_uid (ExamEnrollment.uid)
+    """
+    result = await session_service.get_exam_questions_for_student(
+        exam_uid=exam_uid,
+        student_uid=student_uid,
+        session=session,
+    )
+    return ExamQuestionsResponse(**result)
+
+
+@exam_session_router.post(
+    "/{exam_uid}/student/{student_uid}/violation",
+    response_model=dict,
+)
+async def log_violation(
+    exam_uid: str,
+    student_uid: str,
+    request_data: ViolationReportRequest,
+    session: AsyncSession = Depends(get_session),
+):
+    """
+    Log a browser-detected violation (tab switching, window focus loss).
+    """
+    await session_service.record_violation(
+        exam_uid=exam_uid,
+        student_uid=student_uid,
+        violation_type=request_data.violation_type,
+        metadata={"count": request_data.count},
+        session=session,
+    )
+    return {"message": "Violation logged successfully"}
+
+
+@exam_session_router.post(
+    "/{exam_uid}/identify",
+    response_model=ExamLinkValidateResponse,
+)
+ 
+ 
+@exam_session_router.post(
+    "/{exam_uid}/identify",
+    response_model=ExamLinkValidateResponse,
+)
+async def identify_student(
+    exam_uid: str,
+    request_data: IdentifyStudentRequest,
+    session: AsyncSession = Depends(get_session),
+):
+    """
+    Look up a student's enrollment UID using their Email or Student ID.
+    Used for broadcast links where the student identity is not in the URL.
+    """
+    result = await session_service.identify_student(
+        exam_uid=exam_uid,
+        identifier=request_data.identifier,
+        session=session,
+    )
+    return ExamLinkValidateResponse(**result)
+@exam_session_router.post(
+    "/session/{session_uid}/update-score",
+    response_model=dict,
+)
+async def update_score(
+    session_uid: str,
+    request_data: UpdateScoreRequest,
+    session: AsyncSession = Depends(get_session),
+):
+    """
+    Admin endpoint to update student score.
+    """
+    updated_session = await session_service.update_session_score(
+        session_uid=session_uid,
+        new_score=request_data.new_score,
+        reason=request_data.adjustment_reason,
+        session=session,
+    )
+    return {
+        "message": "Score updated successfully",
+        "new_score": updated_session.score,
+        "new_percentage": updated_session.score_percentage
+    }
+
+
+@exam_session_router.get(
+    "/{exam_uid}/results",
+    response_model=list,
+)
+async def get_exam_results(
+    exam_uid: str,
+    session: AsyncSession = Depends(get_session),
+):
+    """
+    Fetch all student results (sessions) for a specific exam.
+    """
+    return await session_service.get_exam_results(exam_uid, session)
+
+
+@exam_session_router.get(
+    "/session/{session_uid}/details",
+    response_model=dict,
+)
+async def get_session_details(
+    session_uid: str,
+    session: AsyncSession = Depends(get_session),
+):
+    """
+    Fetch detailed audit log for a specific exam session.
+    """
+    return await session_service.get_session_details(session_uid, session)
+
+
+@exam_session_router.post("/session/{session_uid}/send-result")
+async def send_result_email(
+    session_uid: uuid.UUID,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_session),
+    token_details: dict = Depends(access_token_bearer),
+):
+    """
+    Send the final result to the student via email.
+    """
+    # Note: In a production system, we should verify the admin owns the exam
+    result_data = await session_service.send_result_to_student(session_uid, session)
+    if not result_data:
+        raise HTTPException(status_code=404, detail="Session not found")
+        
+    background_tasks.add_task(
+        send_exam_result_email,
+        to_email=result_data["email"],
+        student_name=result_data["student_name"],
+        exam_title=result_data["exam_title"],
+        score=result_data["score"],
+        percentage=result_data["percentage"]
+    )
+    
+    return {"message": "Result email queued successfully"}
+
+
+@exam_session_router.websocket("/{exam_uid}/student/{student_uid}/ws")
+async def exam_websocket_endpoint(
+    websocket: WebSocket,
+    exam_uid: str,
+    student_uid: str
+):
+    """
+    WebSocket endpoint for real-time exam monitoring.
+    Handles student heartbeats and violation broadcasts.
+    """
+    await manager.connect_student(websocket, student_uid)
+    try:
+        while True:
+            # Receive message from student (could be heartbeat or browser event)
+            data = await websocket.receive_text()
+            print(f"📥 Received from student {student_uid}: {data}")
+            message = {"type": "student_update", "student_uid": student_uid, "data": data}
+            # Broadcast to any monitoring examiners
+            await manager.notify_monitor(exam_uid, message)
+    except WebSocketDisconnect:
+        manager.disconnect_student(websocket, student_uid)
+    except Exception as e:
+        print(f"WS Error: {e}")
+        manager.disconnect_student(websocket, student_uid)
+
+
+@exam_session_router.websocket("/{exam_uid}/monitor/ws")
+async def exam_monitor_websocket_endpoint(
+    websocket: WebSocket,
+    exam_uid: str
+):
+    """
+    WebSocket endpoint for examiners to monitor an exam in real-time.
+    Receives all student updates broadcasted by the manager.
+    """
+    await manager.connect_monitor(websocket, exam_uid)
+    try:
+        while True:
+            # Monitors usually just listen, but we can handle ping/pong here if needed
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect_monitor(websocket, exam_uid)
+    except Exception as e:
+        print(f"Monitor WS Error: {e}")
+        manager.disconnect_monitor(websocket, exam_uid)

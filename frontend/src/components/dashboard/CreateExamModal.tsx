@@ -1,7 +1,7 @@
 "use client"
 import React, { useState, useEffect } from 'react'
 import { apiFetch } from '@/src/lib/api'
-import { X, Calendar, Clock } from 'lucide-react'
+import { X, Calendar, Clock, AlertCircle } from 'lucide-react'
 
 interface Subject {
   uid: string
@@ -24,6 +24,8 @@ export default function CreateExamModal({ isOpen, onClose, institutionUid, subje
   const [durationMinutes, setDurationMinutes] = useState(60)
   const [startTime, setStartTime] = useState('')
   const [endTime, setEndTime] = useState('')
+  const [shuffleQuestions, setShuffleQuestions] = useState(false)
+  const [shuffleOptions, setShuffleOptions] = useState(false)
   
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -44,6 +46,8 @@ export default function CreateExamModal({ isOpen, onClose, institutionUid, subje
     setTitle('')
     setDescription('')
     setDurationMinutes(60)
+    setShuffleQuestions(false)
+    setShuffleOptions(false)
     setError(null)
   }, [isOpen])
 
@@ -68,7 +72,9 @@ export default function CreateExamModal({ isOpen, onClose, institutionUid, subje
           subject_uid: subjectUid,
           duration_minutes: durationMinutes,
           start_time: startUTC,
-          end_time: endUTC
+          end_time: endUTC,
+          shuffle_questions: shuffleQuestions,
+          shuffle_options: shuffleOptions
         })
       })
 
@@ -198,6 +204,57 @@ export default function CreateExamModal({ isOpen, onClose, institutionUid, subje
                   required
                   className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                 />
+              </div>
+            </div>
+
+            <div className="col-span-1 md:col-span-2 flex flex-col gap-4">
+              <div className="flex items-center justify-between p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                <div>
+                  <h4 className="text-sm font-bold text-slate-900">Shuffle Questions</h4>
+                  <p className="text-[11px] text-slate-500">Each student will see questions in a randomized order.</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={shuffleQuestions}
+                    onChange={(e) => setShuffleQuestions(e.target.checked)}
+                    className="sr-only peer" 
+                  />
+                  <div className="w-10 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-900">Shuffle Options</h4>
+                    <p className="text-[11px] text-slate-500">Randomize choices (A, B, C, D) within each question.</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={shuffleOptions}
+                      onChange={(e) => setShuffleOptions(e.target.checked)}
+                      className="sr-only peer" 
+                    />
+                    <div className="w-10 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                  </label>
+                </div>
+
+                {shuffleOptions && (
+                  <div className="mt-3 p-3 bg-white border border-amber-50 rounded-lg flex gap-3 animate-in fade-in slide-in-from-top-1">
+                    <AlertCircle className="text-amber-600 shrink-0" size={16} />
+                    <div className="text-[11px] text-amber-800 leading-relaxed">
+                      <p className="font-bold mb-1">Notice: Option shuffling may affect questions with:</p>
+                      <ul className="list-disc ml-4 space-y-0.5">
+                        <li>All of the above</li>
+                        <li>None of the above</li>
+                        <li>Both A and B</li>
+                      </ul>
+                      <p className="mt-1 italic opacity-80">Use position-independent wording instead.</p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

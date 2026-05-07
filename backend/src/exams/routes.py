@@ -23,10 +23,11 @@ from .schema import (
     BulkPreEnrollModel,
     StudentRosterResponseModel,
     StudentUpdateModel,
-    ExamInvitationModel
+    ExamInvitationModel,
+    BulkUnenrollModel
 )
 from src.config import Config
-from src.auth.email import send_exam_invitation_email
+from src.auth.email import send_exam_invitation_email, send_exam_link_email
 
 exam_router = APIRouter()
 exam_service = ExamService()
@@ -280,6 +281,22 @@ async def unenroll_student(
     if not success:
         raise HTTPException(status_code=404, detail="Enrollment not found or unauthorized")
     return {"message": "Student successfully removed from exam"}
+    
+@exam_router.post("/{exam_uid}/bulk-unenroll")
+async def bulk_unenroll_students(
+    exam_uid: str,
+    unenroll_data: BulkUnenrollModel,
+    session: AsyncSession = Depends(get_session),
+    token_details: dict = Depends(access_token_bearer),
+    admin_only=Depends(role)
+):
+    admin_uid = str(token_details.get("user")["uid"])
+    success = await exam_service.bulk_remove_students_from_exam(
+        session, exam_uid, unenroll_data.student_uids, admin_uid
+    )
+    if not success:
+        raise HTTPException(status_code=404, detail="Exam not found or unauthorized")
+    return {"message": f"Successfully removed {len(unenroll_data.student_uids)} students from exam"}
 
 @exam_router.patch("/students/{student_uid}", response_model=StudentRosterResponseModel)
 async def update_enrollment_student(
@@ -325,3 +342,115 @@ async def send_exam_invitations(
             )
             
     return {"message": f"Invitations are being sent to {len(enrollments)} students."}
+
+
+@exam_router.post("/{exam_uid}/exam-link")
+async def generate_exam_link(
+    exam_uid: str,
+    session: AsyncSession = Depends(get_session),
+    token_details: dict = Depends(access_token_bearer),
+    admin_only=Depends(role),
+):
+    """
+    Generate a broadcast exam entry link for enrolled students.
+    The link is valid only during exam.start_time → exam.end_time (enforced at entry).
+    Token uses a 1-year max_age since timing is validated against the exam window, not token age.
+    """
+    exam = await exam_service.get_an_exam(exam_uid, session)
+    if not exam:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam not found")
+
+    admin_uid = str(token_details.get("user")["uid"])
+    if str(exam.admin_uid) != admin_uid:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorised")
+
+    token = create_url_safe_token({"exam_uid": exam_uid})
+    exam_url = f"{Config.FRONTEND_URL}/exam/enter/{token}"
+
+    exam.exam_link = exam_url
+    session.add(exam)
+    await session.commit()
+
+    return {
+        "exam_link": exam_url,
+        "exam_uid": exam_uid,
+        "exam_title": exam.title,
+        "exam_start_time": exam.start_time.isoformat(),
+        "exam_end_time": exam.end_time.isoformat(),
+    }
+
+
+@exam_router.post("/{exam_uid}/send-exam-link")
+async def send_exam_link(
+    exam_uid: str,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_session),
+    token_details: dict = Depends(access_token_bearer),
+    admin_only=Depends(role),
+):
+    """
+    Send the exam entry link to all enrolled students (status = 'enrolled') via email.
+    Runs email sends as background tasks.
+    """
+    from src.db.models import ExamEnrollment, ExamEnrollmentStatus
+    from sqlmodel import select
+
+    exam = await exam_service.get_an_exam(exam_uid, session)
+    if not exam:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam not found")
+
+    admin_uid = str(token_details.get("user")["uid"])
+    if str(exam.admin_uid) != admin_uid:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorised")
+
+    if not exam.exam_link:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Exam link has not been generated yet. Generate it first.",
+        )
+
+    # Only send to students who have completed face registration (enrolled)
+    result = await session.exec(
+        select(ExamEnrollment).where(
+            ExamEnrollment.exam_uid == exam_uid,
+            ExamEnrollment.status == ExamEnrollmentStatus.enrolled,
+        )
+    )
+    enrolled_students = result.all()
+
+    if not enrolled_students:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No enrolled students found. Students must complete face registration first.",
+        )
+
+    from datetime import timezone, timedelta
+    WAT = timezone(timedelta(hours=1))
+
+    for student in enrolled_students:
+        # Create a personalized token for this specific student
+        token_data = {
+            "exam_uid": str(exam_uid),
+            "student_uid": str(student.uid)
+        }
+        personalized_token = create_url_safe_token(token_data)
+        personalized_url = f"{Config.FRONTEND_URL}/exam/enter/{personalized_token}"
+
+        # Convert UTC to local (WAT) for display in email
+        local_start = exam.start_time.astimezone(WAT) if exam.start_time.tzinfo else exam.start_time.replace(tzinfo=timezone.utc).astimezone(WAT)
+        local_end = exam.end_time.astimezone(WAT) if exam.end_time.tzinfo else exam.end_time.replace(tzinfo=timezone.utc).astimezone(WAT)
+
+        background_tasks.add_task(
+            send_exam_link_email,
+            to_email=student.email,
+            student_name=f"{student.first_name} {student.last_name}",
+            exam_title=exam.title,
+            exam_url=personalized_url,
+            exam_start_time=local_start.strftime("%B %d, %Y at %I:%M %p WAT"),
+            exam_end_time=local_end.strftime("%B %d, %Y at %I:%M %p WAT"),
+        )
+
+    return {
+        "message": f"Exam link is being sent to {len(enrolled_students)} enrolled student(s).",
+        "recipients": len(enrolled_students),
+    }

@@ -13,7 +13,7 @@ export default function StudentEnrollPage() {
   const token = params.token as string
 
   // Initial link validation state
-  const [linkStatus, setLinkStatus] = useState<'checking' | 'valid' | 'expired' | 'error'>('checking')
+  const [linkStatus, setLinkStatus] = useState<'checking' | 'valid' | 'expired' | 'error' | 'not_yet_open'>('checking')
   const [linkMessage, setLinkMessage] = useState("")
 
   const [firstName, setFirstName] = useState("")
@@ -45,8 +45,14 @@ export default function StudentEnrollPage() {
           setLinkStatus('valid')
         } else {
           const errData = await res.json()
-          setLinkMessage(errData.detail || "Enrollment link is invalid or expired.")
-          setLinkStatus('expired')
+          const detail = errData.detail || ""
+          setLinkMessage(detail || "Enrollment link is invalid or expired.")
+          
+          if (detail.includes("not started yet")) {
+            setLinkStatus('not_yet_open')
+          } else {
+            setLinkStatus('expired')
+          }
         }
       } catch (err) {
         setLinkMessage("Network error confirming the link.")
@@ -105,21 +111,41 @@ export default function StudentEnrollPage() {
     )
   }
 
-  if (linkStatus === 'expired' || linkStatus === 'error') {
+  if (linkStatus === 'expired' || linkStatus === 'error' || linkStatus === 'not_yet_open') {
+    const isNotStarted = linkStatus === 'not_yet_open'
+    const isError = linkStatus === 'error'
+
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="w-full max-w-md bg-white rounded-xl border border-slate-200 p-8 text-center">
-          <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
-            {linkStatus === 'expired' ? <Clock size={32} className="text-red-600" /> : <AlertCircle size={32} className="text-red-600" />}
+      <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50">
+        <div className="w-full max-w-md bg-white rounded-2xl border border-slate-200 p-8 text-center shadow-sm">
+          <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
+            isNotStarted ? 'bg-amber-100' : 'bg-red-100'
+          }`}>
+            {isNotStarted ? (
+              <Clock size={32} className="text-amber-600" />
+            ) : isError ? (
+              <AlertCircle size={32} className="text-red-600" />
+            ) : (
+              <Clock size={32} className="text-red-600" />
+            )}
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 mb-2">Link Invalid</h1>
-          <p className="text-slate-500 mb-6">
+          
+          <h1 className="text-2xl font-bold text-slate-900 mb-2">
+            {isNotStarted ? 'Enrollment Not Started' : 'Link Invalid'}
+          </h1>
+          
+          <p className="text-slate-500 mb-6 font-medium">
             {linkMessage}
           </p>
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-left text-sm text-slate-600">
-            This link is no longer valid.
 
-            It may have expired or already been used. Please contact your lecturer to request a new enrollment link.
+          <div className={`rounded-xl p-4 text-left text-sm ${
+            isNotStarted ? 'bg-amber-50 border border-amber-100 text-amber-800' : 'bg-slate-50 border border-slate-200 text-slate-600'
+          }`}>
+            {isNotStarted ? (
+              "This enrollment period has not yet begun. Please check the schedule provided by your lecturer and return once it is active."
+            ) : (
+              "This link is no longer valid. It may have expired or already been used. Please contact your lecturer to request a new enrollment link."
+            )}
           </div>
         </div>
       </div>

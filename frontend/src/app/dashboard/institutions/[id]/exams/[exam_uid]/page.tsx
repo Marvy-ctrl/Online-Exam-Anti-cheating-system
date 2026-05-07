@@ -1,9 +1,10 @@
 "use client"
 import React, { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ChevronRight, ChevronLeft, Users, FileText, Cog, ShieldCheck, Mail, Calendar, Trash2, Edit2, AlertCircle, Copy, Send, CheckCircle } from 'lucide-react'
+import { ChevronRight, ChevronLeft, Users, FileText, Cog, ShieldCheck, Mail, Calendar, Trash2, Edit2, AlertCircle, Copy, Send, CheckCircle, HelpCircle, Activity, ExternalLink, X, Wifi, WifiOff, ShieldAlert, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { apiFetch } from '@/src/lib/api'
+import QuestionManager from '@/src/components/dashboard/QuestionManager'
 
 interface Exam {
   uid: string
@@ -14,8 +15,11 @@ interface Exam {
   start_time: string
   end_time: string
   enroll_link: string | null
+  exam_link: string | null
   link_start_time: string | null
   link_end_time: string | null
+  shuffle_questions: boolean
+  shuffle_options: boolean
 }
 
 interface Student {
@@ -27,7 +31,31 @@ interface Student {
   status?: string
 }
 
-type Tab = 'overview' | 'enrolled' | 'settings'
+type Tab = 'overview' | 'enrolled' | 'questions' | 'results' | 'settings'
+
+interface ExamResult {
+  session_uid: string
+  student_uid: string
+  student_name: string
+  student_id: string
+  email: string
+  status: string
+  score: number | null
+  score_percentage: number | null
+  adjustment_reason: string | null
+  violation_count: number
+  violation_summary: string
+  end_time: string | null
+}
+
+interface LiveEvent {
+  id: number
+  student_name: string
+  student_id: string
+  violation_type: string
+  timestamp: string
+  message: string
+}
 
 export default function ExamDetailWorkspace() {
   const params = useParams()
@@ -46,6 +74,12 @@ export default function ExamDetailWorkspace() {
   const [copySuccess, setCopySuccess] = useState(false)
   const [sendSuccess, setSendSuccess] = useState(false)
 
+  // Exam Link State
+  const [isGeneratingExamLink, setIsGeneratingExamLink] = useState(false)
+  const [isSendingExamLink, setIsSendingExamLink] = useState(false)
+  const [examLinkCopySuccess, setExamLinkCopySuccess] = useState(false)
+  const [sendExamLinkSuccess, setSendExamLinkSuccess] = useState(false)
+
   // Manual Expiry State
   const [linkStartTime, setLinkStartTime] = useState("")
   const [linkEndTime, setLinkEndTime] = useState("")
@@ -57,7 +91,28 @@ export default function ExamDetailWorkspace() {
   const [editDescription, setEditDescription] = useState("")
   const [editStartTime, setEditStartTime] = useState("")
   const [editEndTime, setEditEndTime] = useState("")
+  const [editShuffleQuestions, setEditShuffleQuestions] = useState(false)
+  const [editShuffleOptions, setEditShuffleOptions] = useState(false)
   const [isUpdatingExam, setIsUpdatingExam] = useState(false)
+  
+  // Results State
+  const [results, setResults] = useState<ExamResult[]>([])
+  const [loadingResults, setLoadingResults] = useState(false)
+  const [showScoreModal, setShowScoreModal] = useState(false)
+  const [selectedSession, setSelectedSession] = useState<ExamResult | null>(null)
+  const [newScore, setNewScore] = useState("")
+  const [adjReason, setAdjReason] = useState("")
+  const [isUpdatingScore, setIsUpdatingScore] = useState(false)
+  
+  // WebSocket Monitoring State
+  const [wsConnected, setWsConnected] = useState(false)
+  const [liveEvents, setLiveEvents] = useState<LiveEvent[]>([])
+  const [showLiveFeed, setShowLiveFeed] = useState(true)
+  const wsRef = React.useRef<WebSocket | null>(null)
+
+  // Bulk Selection State
+  const [selectedStudentUids, setSelectedStudentUids] = useState<Set<string>>(new Set())
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false)
 
   const fetchExamData = async () => {
     setLoading(true)
@@ -78,6 +133,8 @@ export default function ExamDetailWorkspace() {
       if (data.description) setEditDescription(data.description)
       if (data.start_time) setEditStartTime(new Date(data.start_time).toISOString().slice(0, 16))
       if (data.end_time) setEditEndTime(new Date(data.end_time).toISOString().slice(0, 16))
+      setEditShuffleQuestions(data.shuffle_questions || false)
+      setEditShuffleOptions(data.shuffle_options || false)
 
       // 2. Fetch students specifically enrolled in this exam
       const stuRes = await apiFetch(`/exam/${exam_uid}/students`)
@@ -103,6 +160,49 @@ export default function ExamDetailWorkspace() {
       }
     } catch (e) {
       alert("An error occurred while deleting the exam.")
+    }
+  }
+
+  const toggleSelectStudent = (uid: string) => {
+    setSelectedStudentUids(prev => {
+      const next = new Set(prev)
+      if (next.has(uid)) next.delete(uid)
+      else next.add(uid)
+      return next
+    })
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedStudentUids.size === students.length) {
+      setSelectedStudentUids(new Set())
+    } else {
+      setSelectedStudentUids(new Set(students.map(s => s.uid)))
+    }
+  }
+
+  const handleBulkRemoveStudents = async () => {
+    if (selectedStudentUids.size === 0) return
+    if (!confirm(`Are you sure you want to remove ${selectedStudentUids.size} selected students?`)) return
+
+    setIsBulkDeleting(true)
+    try {
+      const res = await apiFetch(`/exam/${exam_uid}/bulk-unenroll`, {
+        method: 'POST',
+        body: JSON.stringify({ student_uids: Array.from(selectedStudentUids) })
+      })
+
+      if (res.ok) {
+        alert(`Removed ${selectedStudentUids.size} students`)
+        setSelectedStudentUids(new Set())
+        await fetchExamData()
+      } else {
+        const data = await res.json()
+        alert(data.detail || "Failed to remove students")
+      }
+    } catch (e) {
+      alert("Network error")
+    } finally {
+      setIsBulkDeleting(false)
     }
   }
 
@@ -207,6 +307,8 @@ export default function ExamDetailWorkspace() {
           description: editDescription,
           start_time: new Date(editStartTime).toISOString(),
           end_time: new Date(editEndTime).toISOString(),
+          shuffle_questions: editShuffleQuestions,
+          shuffle_options: editShuffleOptions,
         })
       })
       if (res.ok) {
@@ -223,10 +325,146 @@ export default function ExamDetailWorkspace() {
     }
   }
 
-  const copyToClipboard = (text: string) => {
+  const copyToClipboard = (text: string, type: 'enroll' | 'exam' = 'enroll') => {
     navigator.clipboard.writeText(text)
-    setCopySuccess(true)
-    setTimeout(() => setCopySuccess(false), 2000)
+    if (type === 'exam') {
+      setExamLinkCopySuccess(true)
+      setTimeout(() => setExamLinkCopySuccess(false), 2000)
+    } else {
+      setCopySuccess(true)
+      setTimeout(() => setCopySuccess(false), 2000)
+    }
+  }
+
+  const handleGenerateExamLink = async () => {
+    setIsGeneratingExamLink(true)
+    try {
+      const res = await apiFetch(`/exam/${exam_uid}/exam-link`, { method: 'POST' })
+      if (res.ok) {
+        fetchExamData()
+      } else {
+        const err = await res.json()
+        alert(`Failed to generate exam link: ${err.detail || 'Unknown error'}`)
+      }
+    } catch (e) {
+      alert('Error generating exam link.')
+    } finally {
+      setIsGeneratingExamLink(false)
+    }
+  }
+
+  const handleSendExamLink = async () => {
+    const enrolledCount = students.filter(s => s.status === 'enrolled').length
+    if (enrolledCount === 0) {
+      alert('No fully enrolled students found. Students must complete face registration before you can send the exam link.')
+      return
+    }
+    setIsSendingExamLink(true)
+    try {
+      const res = await apiFetch(`/exam/${exam_uid}/send-exam-link`, { method: 'POST' })
+      if (res.ok) {
+        setSendExamLinkSuccess(true)
+        setTimeout(() => setSendExamLinkSuccess(false), 3000)
+      } else {
+        const err = await res.json()
+        alert(`Failed to send exam link: ${err.detail || 'Unknown error'}`)
+      }
+    } catch (e) {
+      alert('Error sending exam link.')
+    } finally {
+      setIsSendingExamLink(false)
+    }
+  }
+
+  const fetchResults = async () => {
+    setLoadingResults(true)
+    try {
+      const res = await apiFetch(`/exam_session/${exam_uid}/results`)
+      if (res.ok) {
+        setResults(await res.json())
+      }
+    } catch (e) { console.error(e) }
+    finally { setLoadingResults(false) }
+  }
+
+  useEffect(() => {
+    if (activeTab === 'results') fetchResults()
+  }, [activeTab])
+
+  // WebSocket Monitoring Connection 
+
+  useEffect(() => {
+    if (!exam_uid || !exam) return
+
+    // Only connect if the exam is currently Active
+    const status = getExamStatus(exam).label
+    if (status !== 'Active') {
+      if (wsRef.current) wsRef.current.close()
+      setWsConnected(false)
+      return
+    }
+
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    const host = process.env.NEXT_PUBLIC_BACKEND_URL 
+      ? process.env.NEXT_PUBLIC_BACKEND_URL.replace('http://', '').replace('https://', '')
+      : 'localhost:8000'
+    const wsUrl = `${protocol}//${host}/api/v1/exam_session/${exam_uid}/monitor/ws`
+    
+    console.log("Monitor connecting to:", wsUrl)
+    const ws = new WebSocket(wsUrl)
+    wsRef.current = ws
+
+    ws.onopen = () => setWsConnected(true)
+    ws.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data)
+        if (payload.type === 'student_update') {
+          const studentData = JSON.parse(payload.data)
+          if (studentData.type === 'violation') {
+            // Find student name from our list
+            const student = students.find(s => s.uid === payload.student_uid)
+            const newEvent = {
+              id: Date.now(),
+              student_name: student ? `${student.first_name} ${student.last_name}` : 'Unknown Student',
+              student_id: student?.student_id || 'N/A',
+              violation_type: studentData.violation_type,
+              timestamp: studentData.timestamp,
+              message: studentData.message || ''
+            }
+            setLiveEvents(prev => [newEvent, ...prev].slice(0, 50)) // Keep last 50
+            
+            // If we are on results tab, maybe refresh or highlight
+            if (activeTab === 'results') {
+              // Highlight logic can be added to the row rendering
+            }
+          }
+        }
+      } catch (e) { console.error("Failed to parse WS message", e) }
+    }
+    ws.onclose = () => setWsConnected(false)
+
+    return () => ws.close()
+  }, [exam_uid, students, exam])
+
+  const handleUpdateScore = async () => {
+    if (!selectedSession) return
+    setIsUpdatingScore(true)
+    try {
+      const res = await apiFetch(`/exam_session/session/${selectedSession.session_uid}/update-score`, {
+        method: 'POST',
+        body: JSON.stringify({
+          new_score: parseFloat(newScore),
+          adjustment_reason: adjReason
+        })
+      })
+      if (res.ok) {
+        setShowScoreModal(false)
+        fetchResults()
+      } else {
+        alert("Failed to update score.")
+      }
+    } catch (e) { alert("Error updating score") }
+    finally { setIsUpdatingScore(false) }
   }
 
   const getExamStatus = (exam: Exam) => {
@@ -269,6 +507,12 @@ export default function ExamDetailWorkspace() {
             <span className={`px-2.5 py-1 text-xs font-bold uppercase tracking-wider rounded-md border ${getExamStatus(exam).cls}`}>
               {getExamStatus(exam).label}
             </span>
+            {wsConnected && getExamStatus(exam).label === 'Active' && (
+              <div className="flex items-center gap-2 px-2 py-1 bg-green-50 border border-green-100 rounded-md">
+                <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+                <span className="text-[10px] font-black text-green-700 uppercase tracking-widest">Live Monitoring Active</span>
+              </div>
+            )}
           </div>
           <p className="text-slate-500 text-sm ml-13 flex items-center gap-2">
             <span className="font-medium text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
@@ -315,6 +559,20 @@ export default function ExamDetailWorkspace() {
         >
           <Users size={16} /> Enrolled Students
           {activeTab === 'enrolled' && <span className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 rounded-t-full"></span>}
+        </button>
+        <button 
+          onClick={() => setActiveTab('questions')}
+          className={`pb-4 flex items-center gap-2 font-medium text-sm transition-colors relative ${activeTab === 'questions' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-900'}`}
+        >
+          <HelpCircle size={16} /> Questions
+          {activeTab === 'questions' && <span className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 rounded-t-full"></span>}
+        </button>
+        <button 
+          onClick={() => setActiveTab('results')}
+          className={`pb-4 flex items-center gap-2 font-medium text-sm transition-colors relative ${activeTab === 'results' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-900'}`}
+        >
+          <CheckCircle size={16} /> Results & Grading
+          {activeTab === 'results' && <span className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 rounded-t-full"></span>}
         </button>
         <button 
           onClick={() => setActiveTab('settings')}
@@ -505,7 +763,7 @@ export default function ExamDetailWorkspace() {
                           className="flex-1 bg-white border border-slate-200 px-3 py-2 rounded-lg text-xs font-mono text-slate-600 outline-none"
                         />
                         <button 
-                          onClick={() => copyToClipboard(exam.enroll_link!)}
+                          onClick={() => copyToClipboard(exam.enroll_link!, 'enroll')}
                           className="p-2 bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors"
                           title="Copy Link"
                         >
@@ -575,13 +833,115 @@ export default function ExamDetailWorkspace() {
                 </div>
               )}
             </div>
+
+            {/* Exam Link Section */}
+            <div className="pt-6 border-t border-slate-100">
+              <h2 className="text-lg font-bold text-slate-900 mb-1 flex items-center gap-2">
+                <ShieldCheck size={20} className="text-green-600" />
+                Exam Entry Link
+              </h2>
+              <p className="text-sm text-slate-500 mb-4">
+                Generate a secure exam link and send it to all fully enrolled students on exam day.
+                The link is only valid during the exam window ({new Date(exam.start_time).toLocaleString()} → {new Date(exam.end_time).toLocaleString()}).
+              </p>
+
+              {!exam.exam_link ? (
+                <div className="bg-green-50 border border-green-100 rounded-2xl p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div>
+                    <h3 className="font-bold text-green-900 mb-1">No Exam Link Generated Yet</h3>
+                    <p className="text-green-700 text-sm">Generate a link to allow enrolled students to enter the exam.</p>
+                  </div>
+                  <button
+                    onClick={handleGenerateExamLink}
+                    disabled={isGeneratingExamLink}
+                    className="shrink-0 px-5 py-2.5 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition-all shadow-lg shadow-green-600/20 disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {isGeneratingExamLink ? 'Generating...' : 'Generate Exam Link'}
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5">
+                    <div className="flex justify-between items-center mb-3">
+                      <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Exam Entry Link</span>
+                      <button
+                        onClick={handleGenerateExamLink}
+                        disabled={isGeneratingExamLink}
+                        className="text-[10px] font-bold text-green-600 hover:bg-green-50 px-2 py-1 rounded transition-colors disabled:opacity-50"
+                      >
+                        {isGeneratingExamLink ? 'Regenerating...' : 'Regenerate'}
+                      </button>
+                    </div>
+                    <div className="flex gap-2 mb-3">
+                      <input
+                        readOnly
+                        value={exam.exam_link}
+                        className="flex-1 bg-white border border-slate-200 px-3 py-2 rounded-lg text-xs font-mono text-slate-600 outline-none"
+                      />
+                      <button
+                        onClick={() => copyToClipboard(exam.exam_link!, 'exam')}
+                        className="p-2 bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors"
+                        title="Copy Link"
+                      >
+                        {examLinkCopySuccess ? <CheckCircle size={18} className="text-green-500" /> : <Copy size={18} />}
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-slate-400 italic">Share this link directly or use the email button →</p>
+                  </div>
+
+                  <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+                    <h3 className="font-bold text-slate-900 mb-1 flex items-center gap-2">
+                      <Mail size={18} className="text-green-600" />
+                      Send to Enrolled Students
+                    </h3>
+                    <p className="text-xs text-slate-500 mb-4">
+                      Emails the exam link to all <strong>{students.filter(s => s.status === 'enrolled').length}</strong> fully enrolled students.
+                    </p>
+                    <button
+                      onClick={handleSendExamLink}
+                      disabled={isSendingExamLink || sendExamLinkSuccess || students.filter(s => s.status === 'enrolled').length === 0}
+                      className={`w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${
+                        sendExamLinkSuccess
+                          ? 'bg-green-600 text-white'
+                          : 'bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-600/20 disabled:opacity-50 disabled:cursor-not-allowed'
+                      }`}
+                    >
+                      {isSendingExamLink ? (
+                        <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Sending...</>
+                      ) : sendExamLinkSuccess ? (
+                        <><CheckCircle size={18} /> Exam Links Sent!</>
+                      ) : (
+                        <><Send size={18} /> Send Exam Link to Students</>
+                      )}
+                    </button>
+                    {students.filter(s => s.status === 'enrolled').length === 0 && (
+                      <p className="text-center text-[11px] text-amber-600 mt-2 font-medium">
+                        No fully enrolled students yet. Students must complete face registration first.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
         {activeTab === 'enrolled' && (
           <div>
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-bold text-slate-900">Enrolled Students</h2>
+              <div className="flex items-center gap-4">
+                <h2 className="text-lg font-bold text-slate-900">Enrolled Students</h2>
+                {selectedStudentUids.size > 0 && (
+                  <button 
+                    onClick={handleBulkRemoveStudents}
+                    disabled={isBulkDeleting}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-red-600 font-bold text-xs  hover:bg-red-100 transition-colors disabled:opacity-50"
+                  >
+                    {isBulkDeleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                    Delete Selected ({selectedStudentUids.size})
+                  </button>
+                )}
+              </div>
               <span className="px-3 py-1 bg-slate-100 text-slate-600 font-medium text-sm rounded-lg border border-slate-200">
                 {students.length} Total
               </span>
@@ -598,6 +958,14 @@ export default function ExamDetailWorkspace() {
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                      <th className="py-3 px-4 w-10">
+                        <input 
+                          type="checkbox" 
+                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                          checked={students.length > 0 && selectedStudentUids.size === students.length}
+                          onChange={toggleSelectAll}
+                        />
+                      </th>
                       <th className="py-3 px-4">Student</th>
                       <th className="py-3 px-4">Email</th>
                       <th className="py-3 px-4">Reg Number</th>
@@ -607,7 +975,15 @@ export default function ExamDetailWorkspace() {
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-sm">
                     {students.map((stu) => (
-                      <tr key={stu.uid} className="hover:bg-slate-50/50 transition-colors group">
+                      <tr key={stu.uid} className={`hover:bg-slate-50/50 transition-colors group ${selectedStudentUids.has(stu.uid) ? 'bg-blue-50/30' : ''}`}>
+                        <td className="py-3 px-4">
+                           <input 
+                            type="checkbox" 
+                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                            checked={selectedStudentUids.has(stu.uid)}
+                            onChange={() => toggleSelectStudent(stu.uid)}
+                          />
+                        </td>
                         <td className="py-3 px-4 font-medium text-slate-900">
                           {stu.first_name} {stu.last_name}
                         </td>
@@ -648,6 +1024,118 @@ export default function ExamDetailWorkspace() {
                 </table>
               </div>
             )}
+          </div>
+        )}
+
+        {activeTab === 'results' && (
+          <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+             <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900">Exam Results & Autograde</h2>
+                  <p className="text-sm text-slate-500">View student performance and adjust marks if necessary.</p>
+                </div>
+                <button 
+                  onClick={fetchResults}
+                  className="p-2 text-slate-400 hover:text-blue-600 transition-colors"
+                  title="Refresh Results"
+                >
+                  <Calendar size={18} className={loadingResults ? "animate-spin" : ""} />
+                </button>
+             </div>
+
+             {loadingResults ? (
+               <div className="py-20 text-center text-slate-400">Loading results...</div>
+             ) : results.length === 0 ? (
+               <div className="py-20 text-center text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                 No submissions yet. Results will appear here once students submit their exams.
+               </div>
+             ) : (
+               <div className="overflow-x-auto rounded-xl border border-slate-200">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                        <th className="py-3 px-4">Student</th>
+                        <th className="py-3 px-4">Score</th>
+                        <th className="py-3 px-4">Percentage</th>
+                        <th className="py-3 px-4">Violations</th>
+                        <th className="py-3 px-4">Status</th>
+                        <th className="py-3 px-4 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-sm">
+                      {results.map((res) => (
+                        <tr key={res.session_uid} className="hover:bg-slate-50/50 transition-colors group">
+                           <td className="py-3 px-4">
+                              <Link 
+                                href={`/dashboard/institutions/${id}/exams/${exam_uid}/audit/${res.session_uid}`}
+                                className="text-left group/name block"
+                              >
+                                <div className="font-medium text-slate-900 group-hover/name:text-blue-600 transition-colors flex items-center gap-1.5">
+                                  {res.student_name}
+                                  <ExternalLink size={12} className="opacity-0 group-hover/name:opacity-100 transition-opacity" />
+                                </div>
+                                <div className="text-xs text-slate-400 font-mono">{res.student_id}</div>
+                              </Link>
+                           </td>
+                           <td className="py-3 px-4 font-bold text-slate-700">{res.score ?? '--'}</td>
+                           <td className="py-3 px-4">
+                              {res.score_percentage !== null ? (
+                                <div className="flex items-center gap-2">
+                                  <div className="w-16 bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                                    <div className="bg-blue-500 h-full" style={{ width: `${res.score_percentage}%` }}></div>
+                                  </div>
+                                  <span className="font-semibold text-slate-600">{res.score_percentage.toFixed(1)}%</span>
+                                </div>
+                              ) : '--'}
+                           </td>
+                           <td className="py-3 px-4">
+                              {res.violation_count > 0 ? (
+                                <div className="space-y-1">
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-50 text-red-600 border border-red-100 rounded text-xs font-bold">
+                                    <AlertCircle size={10} /> {res.violation_count} Violations
+                                  </span>
+                                  {res.violation_summary && res.violation_summary !== 'None' && (
+                                    <p className="text-[10px] text-slate-500 font-medium leading-tight">
+                                      {res.violation_summary}
+                                    </p>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-slate-400 text-xs">No violations</span>
+                              )}
+                           </td>
+                           <td className="py-3 px-4">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                res.status === 'Submitted' ? 'bg-green-50 text-green-600 border border-green-100' : 'bg-blue-50 text-blue-600 border border-blue-100'
+                              }`}>
+                                {res.status}
+                              </span>
+                           </td>
+                           <td className="py-3 px-4 text-right">
+                              <button 
+                                onClick={() => {
+                                  setSelectedSession(res)
+                                  setNewScore(res.score?.toString() || "")
+                                  setAdjReason(res.adjustment_reason || "")
+                                  setShowScoreModal(true)
+                                }}
+                                className="px-3 py-1 bg-white border border-slate-200 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-50 hover:border-blue-300 transition-all"
+                              >
+                                Edit Score
+                              </button>
+                           </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+               </div>
+             )}
+          </div>
+        )}
+
+        {activeTab === 'questions' && (
+          <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+             <QuestionManager examUid={exam_uid} />
           </div>
         )}
 
@@ -711,6 +1199,59 @@ export default function ExamDetailWorkspace() {
                     />
                   </div>
                 </div>
+
+                <div className="space-y-4 pt-2">
+                  <div className="flex items-center justify-between p-4 bg-slate-50 border border-slate-200 rounded-2xl transition-all hover:border-blue-200">
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-900">Shuffle Questions</h4>
+                      <p className="text-xs text-slate-500">Each student will receive questions in a different order.</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={editShuffleQuestions}
+                        onChange={(e) => setEditShuffleQuestions(e.target.checked)}
+                        className="sr-only peer" 
+                      />
+                      <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                  </div>
+
+                  <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl transition-all hover:border-blue-200">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="text-sm font-bold text-slate-900">Shuffle Options</h4>
+                        <p className="text-xs text-slate-500">Randomize the order of choices within each question.</p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          checked={editShuffleOptions}
+                          onChange={(e) => setEditShuffleOptions(e.target.checked)}
+                          className="sr-only peer" 
+                        />
+                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                      </label>
+                    </div>
+
+                    {editShuffleOptions && (
+                      <div className="mt-4 p-3 bg-white border border-amber-200 rounded-xl flex gap-3 animate-in fade-in slide-in-from-top-1 duration-300">
+                        <AlertCircle className="text-amber-600 shrink-0" size={18} />
+                        <div className="text-xs text-amber-800 leading-relaxed">
+                          <p className="font-bold mb-1">Notice: Potential Question Ambiguity</p>
+                          <p>Option shuffling may affect questions containing phrases like:</p>
+                          <ul className="list-disc ml-4 mt-1 space-y-0.5">
+                            <li>All of the above</li>
+                            <li>None of the above</li>
+                            <li>Both A and B</li>
+                          </ul>
+                          <p className="mt-2 italic">Consider using position-independent wording instead.</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 <button
                   type="submit"
                   disabled={isUpdatingExam}
@@ -722,7 +1263,106 @@ export default function ExamDetailWorkspace() {
            </div>
         )}
       </div>
-      
+
+      {/* Update Score Modal */}
+      {showScoreModal && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8 animate-in zoom-in-95 duration-200">
+              <h3 className="text-xl font-bold text-slate-900 mb-2">Adjust Student Score</h3>
+              <p className="text-sm text-slate-500 mb-6">Manually update <strong>{selectedSession?.student_name}</strong>`s results.</p>
+              
+              <div className="space-y-4 mb-8">
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">New Score (Marks)</label>
+                  <input 
+                    type="number"
+                    step="0.1"
+                    value={newScore}
+                    onChange={(e) => setNewScore(e.target.value)}
+                    placeholder="Enter raw score"
+                    className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Reason for Adjustment</label>
+                  <textarea 
+                    value={adjReason}
+                    onChange={(e) => setAdjReason(e.target.value)}
+                    placeholder="e.g. Penalized for tab switching violations"
+                    className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all min-h-[100px] resize-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button 
+                  onClick={() => setShowScoreModal(false)}
+                  className="flex-1 py-3 bg-slate-50 text-slate-600 font-bold rounded-xl hover:bg-slate-100 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={handleUpdateScore}
+                  disabled={isUpdatingScore}
+                  className="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20 disabled:opacity-50"
+                >
+                  {isUpdatingScore ? "Updating..." : "Save Changes"}
+                </button>
+              </div>
+           </div>
+        </div>
+      )}
+      {/* Live Activity Feed Overlay */}
+      {wsConnected && showLiveFeed && getExamStatus(exam).label === 'Active' && (
+        <div className="fixed bottom-6 right-6 w-80 max-h-[400px] bg-white border border-slate-200 rounded-2xl shadow-2xl flex flex-col overflow-hidden z-40 animate-in slide-in-from-right duration-300">
+          <div className="p-4 bg-slate-900 text-white flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Activity size={16} className="text-green-400" />
+              <span className="text-xs font-bold uppercase tracking-widest">Live Activity Feed</span>
+            </div>
+            <button onClick={() => setShowLiveFeed(false)} className="hover:text-slate-400 transition-colors">
+              <X size={16} />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/50">
+            {liveEvents.length === 0 ? (
+              <div className="py-10 text-center">
+                <ShieldCheck size={24} className="text-slate-300 mx-auto mb-2" />
+                <p className="text-[10px] text-slate-400 font-medium uppercase tracking-widest">No recent activity</p>
+              </div>
+            ) : (
+              liveEvents.map(event => (
+                <div key={event.id} className="p-3 bg-white border border-slate-200 rounded-xl shadow-sm animate-in fade-in slide-in-from-top-1 duration-300">
+                  <div className="flex items-start justify-between mb-1">
+                    <span className="text-[10px] font-bold text-slate-900 truncate max-w-[140px]">{event.student_name}</span>
+                    <span className="text-[8px] font-mono text-slate-400">{new Date(event.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <ShieldAlert size={10} className="text-red-500" />
+                    <span className="text-[9px] font-black text-red-600 uppercase tracking-tighter">{event.violation_type.replace(/_/g, ' ')}</span>
+                  </div>
+                  {event.message && <p className="text-[9px] text-slate-500 italic leading-tight">{event.message}</p>}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Re-open Live Feed button */}
+      {wsConnected && !showLiveFeed && getExamStatus(exam).label === 'Active' && (
+        <button 
+          onClick={() => setShowLiveFeed(true)}
+          className="fixed bottom-6 right-6 w-12 h-12 bg-slate-900 text-white rounded-full shadow-xl flex items-center justify-center hover:scale-110 transition-transform z-40"
+        >
+          <Activity size={20} className="text-green-400" />
+          {liveEvents.length > 0 && (
+            <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-white">
+              {liveEvents.length}
+            </span>
+          )}
+        </button>
+      )}
     </div>
   )
 }

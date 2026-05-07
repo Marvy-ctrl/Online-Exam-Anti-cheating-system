@@ -19,6 +19,7 @@ from src.students.routes import student_router
 from src.questions.routes import questions_router
 from src.exam_session.routes import exam_session_router
 from src.institutions.router import institution_router
+from src.analytics.router import analytics_router
 from .config import Config
 
 @asynccontextmanager
@@ -36,7 +37,13 @@ app = FastAPI(lifespan=life_span, version=version)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[Config.FRONTEND_URL, "http://192.168.0.177:3000"],
+    allow_origins=[
+        Config.FRONTEND_URL, 
+        "http://localhost:3000", 
+        "http://127.0.0.1:3000",
+        "http://0.0.0.0:3000",
+        "http://192.168.0.177:3000"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -54,4 +61,7 @@ app.include_router(
 )
 app.include_router(
     institution_router, prefix=f"/api/{version}/institutions", tags=["institutions"]
+)
+app.include_router(
+    analytics_router, prefix=f"/api/{version}/analytics", tags=["analytics"]
 )

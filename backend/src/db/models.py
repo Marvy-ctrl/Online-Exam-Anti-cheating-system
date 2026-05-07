@@ -54,7 +54,7 @@ class Institution(SQLModel, table=True):
             pg.UUID, primary_key=True, unique=True, nullable=False, default=uuid.uuid4
         )
     )
-    admin_uid: uuid.UUID = Field(sa_column=Column(pg.UUID, ForeignKey("admin.uid")))
+    admin_uid: uuid.UUID = Field(sa_column=Column(pg.UUID, ForeignKey("admin.uid", ondelete="CASCADE")))
     name: str
     short_info: Optional[str] = None
     logo_url: Optional[str] = None
@@ -99,7 +99,7 @@ class Student(SQLModel, table=True):
         )
     )
     institution_uid: uuid.UUID = Field(
-        sa_column=Column(pg.UUID, ForeignKey("institution.uid"))
+        sa_column=Column(pg.UUID, ForeignKey("institution.uid", ondelete="CASCADE"))
     )
     first_name: str
     last_name: str
@@ -127,36 +127,6 @@ class Student(SQLModel, table=True):
     )
 
 
-
-
-    # class Admin(SQLModel, table=True):
-    # __tablename__ = "admin"
-
-    # uid: uuid.UUID = Field(
-    #     default_factory=uuid.uuid4,
-    #     primary_key=True
-    # )
-
-    # first_name: str
-    # last_name: str
-    # email: str = Field(unique=True, index=True)
-    # password: str
-    # role: str = "admin"
-    # is_verified: bool = False
-
-    # created_at: datetime = Field(
-    #     default_factory=lambda: datetime.now(timezone.utc)
-    # )
-    # updated_at: datetime = Field(
-    #     default_factory=lambda: datetime.now(timezone.utc)
-    # )
-
-    # exams: List["Exam"] = Relationship(
-    #     back_populates="admin",
-    #     sa_relationship_kwargs={"cascade": "all, delete-orphan"}
-    # )
-
-
 class Subject(SQLModel, table=True):
     __tablename__ = "subject"
 
@@ -166,7 +136,7 @@ class Subject(SQLModel, table=True):
         )
     )
     institution_uid: uuid.UUID = Field(
-        sa_column=Column(pg.UUID, ForeignKey("institution.uid"))
+        sa_column=Column(pg.UUID, ForeignKey("institution.uid", ondelete="CASCADE"))
     )
     name: str
 
@@ -194,8 +164,8 @@ class SubjectEnrollment(SQLModel, table=True):
             pg.UUID, primary_key=True, unique=True, nullable=False, default=uuid.uuid4
         )
     )
-    subject_uid: uuid.UUID = Field(sa_column=Column(pg.UUID, ForeignKey("subject.uid")))
-    student_uid: uuid.UUID = Field(sa_column=Column(pg.UUID, ForeignKey("student.uid")))
+    subject_uid: uuid.UUID = Field(sa_column=Column(pg.UUID, ForeignKey("subject.uid", ondelete="CASCADE")))
+    student_uid: uuid.UUID = Field(sa_column=Column(pg.UUID, ForeignKey("student.uid", ondelete="CASCADE")))
     
     created_at: datetime = Field(
         sa_column=Column(
@@ -216,12 +186,12 @@ class Exam(SQLModel, table=True):
             pg.UUID, primary_key=True, unique=True, nullable=False, default=uuid.uuid4
         )
     )
-    admin_uid: uuid.UUID = Field(sa_column=Column(pg.UUID, ForeignKey("admin.uid")))
+    admin_uid: uuid.UUID = Field(sa_column=Column(pg.UUID, ForeignKey("admin.uid", ondelete="CASCADE")))
     institution_uid: uuid.UUID = Field(
         sa_column=Column(pg.UUID, ForeignKey("institution.uid"))
     )
     subject_uid: Optional[uuid.UUID] = Field(
-        sa_column=Column(pg.UUID, ForeignKey("subject.uid"))
+        sa_column=Column(pg.UUID, ForeignKey("subject.uid", ondelete="CASCADE"))
     )
     title: str
     description: Optional[str] = None
@@ -237,6 +207,9 @@ class Exam(SQLModel, table=True):
         )
     )
     enroll_link: Optional[str] = None
+    exam_link: Optional[str] = None
+    shuffle_questions: bool = Field(default=False)
+    shuffle_options: bool = Field(default=False)
 
     link_start_time: Optional[datetime] = Field(
         sa_column=Column(TIMESTAMP(timezone=True), nullable=True)
@@ -276,7 +249,7 @@ class Exam(SQLModel, table=True):
 
     sessions: List["ExamSession"] = Relationship(
         back_populates="exam",
-        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+        sa_relationship_kwargs={"cascade": "all, delete-orphan", "passive_deletes": True}
     )
 
 
@@ -292,7 +265,7 @@ class ExamEnrollment(SQLModel, table=True):
             pg.UUID, primary_key=True, unique=True, nullable=False, default=uuid.uuid4
         )
     )
-    exam_uid: uuid.UUID = Field(sa_column=Column(pg.UUID, ForeignKey("exam.uid")))
+    exam_uid: uuid.UUID = Field(sa_column=Column(pg.UUID, ForeignKey("exam.uid", ondelete="CASCADE")))
     student_uid: Optional[uuid.UUID] = Field(
         default=None,
         sa_column=Column(pg.UUID, ForeignKey("student.uid", ondelete="SET NULL"))
@@ -358,11 +331,12 @@ class Question(SQLModel, table=True):
 
     uid: uuid.UUID = Field(
         sa_column=Column(
-            pg.UUID, primary_key=True, unique=True, nullable=False, default=uuid.uuid4
+            pg.UUID,primary_key=True, unique=True, nullable=False, default=uuid.uuid4
         ),
     )
-    exam_uid: uuid.UUID = Field(sa_column=Column(pg.UUID, ForeignKey("exam.uid")))
+    exam_uid: uuid.UUID = Field(sa_column=Column(pg.UUID, ForeignKey("exam.uid", ondelete="CASCADE")))
     question_text: str
+    marks: Optional[float] = Field(default=1.0, nullable=True)
     order_index: int
     created_at: datetime = Field(
         sa_column=Column(
@@ -378,7 +352,7 @@ class Question(SQLModel, table=True):
     exam: "Exam" = Relationship(back_populates="questions")
     options: List["Options"] = Relationship(
         back_populates="question",
-        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+        sa_relationship_kwargs={"cascade": "all, delete-orphan", "passive_deletes": True}
     )
 
 
@@ -386,11 +360,12 @@ class Options(SQLModel, table=True):
     __tablename__ = "options"
     uid: uuid.UUID = Field(
         sa_column=Column(
-            pg.UUID, primary_key=True, unique=True, nullable=False, default=uuid.uuid4
+            pg.UUID,  
+            primary_key=True, unique=True, nullable=False, default=uuid.uuid4
         ),
     )
     question_uid: uuid.UUID = Field(
-        sa_column=Column(pg.UUID, ForeignKey("question.uid"))
+        sa_column=Column(pg.UUID, ForeignKey("question.uid", ondelete="CASCADE"))
     )
     option_text: str
     is_correct: bool
@@ -410,12 +385,12 @@ class ExamSession(SQLModel, table=True):
     uid: uuid.UUID = Field(
         sa_column=Column(
             pg.UUID, primary_key=True, unique=True, nullable=False, default=uuid.uuid4
-        ),
+        ),  
     )
     student_uid: uuid.UUID = Field(
-        sa_column=Column(pg.UUID, ForeignKey("enrollment.uid"))
+        sa_column=Column(pg.UUID, ForeignKey("enrollment.uid", ondelete="CASCADE"))
     )
-    exam_uid: uuid.UUID = Field(sa_column=Column(pg.UUID, ForeignKey("exam.uid")))
+    exam_uid: uuid.UUID = Field(sa_column=Column(pg.UUID, ForeignKey("exam.uid", ondelete="CASCADE")))
     start_time: datetime = Field(
         sa_column=Column(
             TIMESTAMP(timezone=True), default=lambda: datetime.now(timezone.utc)
@@ -428,6 +403,8 @@ class ExamSession(SQLModel, table=True):
         sa_column=Column(TIMESTAMP(timezone=True), nullable=True)
     )
     score: Optional[float] = None
+    score_percentage: Optional[float] = None
+    adjustment_reason: Optional[str] = None
     status: ExamStatus = Field(
         sa_column=Column(
             pg.ENUM(ExamStatus, name="exam_status", create_type=True),
@@ -462,22 +439,31 @@ class StudentAnswers(SQLModel, table=True):
         ),
     )
     session_uid: uuid.UUID = Field(
-        sa_column=Column(pg.UUID, ForeignKey("exam_session.uid"))
+        sa_column=Column(pg.UUID, ForeignKey("exam_session.uid", ondelete="CASCADE"))
     )
     question_uid: uuid.UUID = Field(
-        sa_column=Column(pg.UUID, ForeignKey("question.uid"))
+        sa_column=Column(pg.UUID, ForeignKey("question.uid", ondelete="CASCADE"))
     )
-    selected_option_uid: uuid.UUID = Field(
-        sa_column=Column(pg.UUID, ForeignKey("options.uid"))
+    # Stores a list of selected option UIDs as JSON — supports single and multi-select questions
+    selected_option_uids: List[str] = Field(
+        default=[],
+        sa_column=Column(JSON, nullable=False, default=list),
     )
-    is_correct: bool
+    # Null until auto-grader runs at submission time. Set by comparing selected_option_uids
+    # against Options.is_correct — never exposed to students during the exam.
+    is_correct: Optional[bool] = Field(
+        default=None,
+        sa_column=Column(pg.BOOLEAN, nullable=True),
+    )
     answered_at: Optional[datetime] = Field(
-        sa_column=Column(TIMESTAMP(timezone=True), nullable=True)
+        sa_column=Column(TIMESTAMP(timezone=True), default=lambda: datetime.now(timezone.utc))
+    )
+    updated_at: Optional[datetime] = Field(
+        sa_column=Column(TIMESTAMP(timezone=True), default=lambda: datetime.now(timezone.utc))
     )
 
     session: "ExamSession" = Relationship(back_populates="answers")
     question: "Question" = Relationship()
-    selected_option: "Options" = Relationship()
 
 
 class Snapshot(SQLModel, table=True):
@@ -489,10 +475,10 @@ class Snapshot(SQLModel, table=True):
         ),
     )
     student_uid: uuid.UUID = Field(
-        sa_column=Column(pg.UUID, ForeignKey("enrollment.uid"))
+        sa_column=Column(pg.UUID, ForeignKey("enrollment.uid", ondelete="CASCADE"))
     )
     session_uid: uuid.UUID = Field(
-        sa_column=Column(pg.UUID, ForeignKey("exam_session.uid"))
+        sa_column=Column(pg.UUID, ForeignKey("exam_session.uid", ondelete="CASCADE"))
     )
     image_path: str
     face_matches: bool = True
@@ -511,6 +497,8 @@ class ViolationType(str, Enum):
     no_face = "No Face Detected"
     multiple_faces = "Multiple Faces Detected"
     face_mismatch = "Face Mismatch"
+    tab_switch = "Tab Switching"
+    focus_loss = "focus_loss"
 
 
 class Violation(SQLModel, table=True):
@@ -522,10 +510,10 @@ class Violation(SQLModel, table=True):
         )
     )
     student_uid: uuid.UUID = Field(
-        sa_column=Column(pg.UUID, ForeignKey("enrollment.uid"))
+        sa_column=Column(pg.UUID, ForeignKey("enrollment.uid", ondelete="CASCADE"))
     )
     session_uid: uuid.UUID = Field(
-        sa_column=Column(pg.UUID, ForeignKey("exam_session.uid"))
+        sa_column=Column(pg.UUID, ForeignKey("exam_session.uid", ondelete="CASCADE"))
     )
     violation_type: ViolationType = Field(
         sa_column=Column(

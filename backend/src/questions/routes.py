@@ -13,6 +13,7 @@ from .schema import (
     OptionsUploadModel,
     BulkQuestionUploadModel,
     QuestionUpdateModel,
+    BulkDeleteQuestionsModel,
 )
 
 questions_router = APIRouter()
@@ -142,3 +143,19 @@ async def delete_question(
         )
 
     return result
+
+
+@questions_router.post("/bulk-delete")
+async def bulk_delete_questions(
+    delete_data: BulkDeleteQuestionsModel,
+    session: AsyncSession = Depends(get_session),
+    token_details: dict = Depends(access_token_bearer),
+    admin_only=Depends(role),
+):
+    success = await question_service.bulk_delete_questions(
+        delete_data.question_uids, session
+    )
+    if not success:
+        raise HTTPException(status_code=400, detail="Failed to delete questions")
+
+    return {"message": f"Successfully deleted {len(delete_data.question_uids)} question(s)"}

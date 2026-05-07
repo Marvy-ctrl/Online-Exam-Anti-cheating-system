@@ -8,6 +8,7 @@ class QuestionUploadModel(BaseModel):
     options: List[str]
     correct_answer: str
     order_index: int
+    marks: float = 1.0
 
 
 class OptionsUploadModel(BaseModel):
@@ -21,5 +22,10 @@ class BulkQuestionUploadModel(BaseModel):
 class QuestionUpdateModel(BaseModel):
     question_text: Optional[str] = None
     order_index: Optional[int] = None
+    marks: Optional[float] = None
     options: Optional[List[str]] = None
     correct_answer: Optional[str] = None
+
+
+class BulkDeleteQuestionsModel(BaseModel):
+    question_uids: List[str]

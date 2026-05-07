@@ -21,13 +21,10 @@ def send_email(to_email: str, subject: str, html_content: str) -> None:
         with smtplib.SMTP_SSL(Config.SMTP_HOST, 465, timeout=15) as server:
             server.login(Config.SMTP_USER, Config.SMTP_PASSWORD)
             server.sendmail(Config.SMTP_FROM, to_email, msg.as_string())
-    # except Exception as e:
-    #     print(f"\n[NETWORK BLOCK] Failed to send email to {to_email}. Error: {e}")
-    #     print("Falling back to local console verification...")
-    #     raise ValueError("SMTP_BLOCKED")
     except Exception as e:
         print(f"\n[NETWORK BLOCK] Failed to send email to {to_email}. Error: {e}")
         print("Falling back to local console verification...")
+        raise ValueError("SMTP_BLOCKED")
 
 
 def send_verification_email(to_email: str, token: str) -> None:
@@ -132,3 +129,105 @@ def send_password_reset_email(to_email: str, token: str) -> None:
         print("Click this link since your network blocked the email:")
         print("RESET LINK:", reset_url)
         print("="*50 + "\n\n")
+
+
+def send_exam_link_email(
+    to_email: str,
+    student_name: str,
+    exam_title: str,
+    exam_url: str,
+    exam_start_time: str,
+    exam_end_time: str,
+) -> None:
+    """
+    Send the exam entry link to an enrolled student.
+    Called via FastAPI BackgroundTasks — smtplib is blocking.
+    """
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #1a1a2e;">
+        <h2 style="color: #2563EB;">Your Exam Is Ready: {exam_title}</h2>
+        <p>Hello {student_name},</p>
+        <p>Your exam <strong>{exam_title}</strong> is now available. Click the button below to enter.</p>
+
+        <div style="background: #f3f4f6; border-left: 4px solid #2563EB; padding: 15px; margin: 20px 0;">
+            <p style="margin: 0; font-size: 14px; color: #374151;">
+                <strong>Exam Window:</strong><br/>
+                Start: {exam_start_time}<br/>
+                End: {exam_end_time}
+            </p>
+        </div>
+
+        <p style="color: #dc2626; font-size: 13px;">
+            The link is only valid during the exam window above.
+            Ensure your webcam is working before clicking.
+        </p>
+
+        <a href="{exam_url}"
+           style="display: inline-block; padding: 14px 28px; background-color: #2563EB;
+                  color: white; text-decoration: none; border-radius: 8px; margin: 16px 0;
+                  font-weight: bold; font-size: 16px;">
+            Enter Exam →
+        </a>
+
+        <p style="color: #666; font-size: 12px;">
+            If the button does not work, copy and paste this link into your browser:<br/>
+            <span style="color: #4f46e5;">{exam_url}</span>
+        </p>
+
+        <p style="color: #999; font-size: 12px; margin-top: 30px;">
+            This message was sent by your institution via the Anti-Cheating Exam System.
+        </p>
+    </body>
+    </html>
+    """
+    try:
+        send_email(to_email, f"Enter Your Exam: {exam_title}", html)
+    except ValueError:
+        print("\n" + "="*60)
+        print("🚀 STUDENT EXAM LINK (EMAIL BLOCKED) 🚀")
+        print(f"STUDENT: {student_name} ({to_email})")
+        print(f"EXAM:    {exam_title}")
+        print(f"LINK:    {exam_url}")
+        print("="*60 + "\n")
+
+def send_exam_result_email(
+    to_email: str,
+    student_name: str,
+    exam_title: str,
+    score: float,
+    percentage: float,
+) -> None:
+    """
+    Send the exam result to a student after examiner review.
+    """
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #1a1a2e;">
+        <h2 style="color: #10b981;">Exam Results: {exam_title}</h2>
+        <p>Hello {student_name},</p>
+        <p>Your institutional administrator has reviewed and released the results for <strong>{exam_title}</strong>.</p>
+
+        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 25px; margin: 25px 0; text-align: center;">
+            <p style="margin: 0; font-size: 14px; color: #166534; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em;">Your Final Score</p>
+            <p style="margin: 10px 0; font-size: 48px; color: #10b981; font-weight: 800;">{percentage:.1f}%</p>
+            <p style="margin: 0; font-size: 16px; color: #15803d;">({score} marks awarded)</p>
+        </div>
+
+
+        <p style="color: #666; font-size: 14px; margin-top: 30px;">
+            Institutional Note: This result is final and has been recorded in your official academic record.
+        </p>
+
+        <p style="color: #999; font-size: 12px; margin-top: 40px; border-top: 1px solid #eee; padding-top: 20px;">
+            This official notification was sent by your institution via the Anti-Cheating Exam System.
+        </p>
+    </body>
+    </html>
+    """
+    try:
+        send_email(to_email, f"Results Released: {exam_title}", html)
+    except Exception as e:
+        print(f"Failed to send result email to {to_email}: {e}")
