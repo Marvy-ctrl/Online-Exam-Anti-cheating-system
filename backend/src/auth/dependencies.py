@@ -118,3 +118,36 @@ async def get_current_user(
     if user.role != "admin":
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Only Admins have access")
     return user
+
+
+async def verify_student_session(
+    request: Request,
+    exam_uid: str,
+    student_uid: str,
+) -> dict:
+    """
+    Dependency to verify a student's session token.
+    Reads HttpOnly cookie and validates scope and URL parameters.
+    """
+    token = request.cookies.get("student_session_token")
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session token missing or expired"
+        )
+        
+    token_data = decode_token(token)
+    
+    if token_data.get("role") != "student":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid token scope"
+        )
+        
+    if token_data.get("exam_uid") != exam_uid or token_data.get("sub") != student_uid:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Token does not match the requested exam or student"
+        )
+        
+    return token_data

@@ -19,77 +19,34 @@ from fastapi.responses import JSONResponse
 from fastapi import status
 from datetime import datetime, timezone, timedelta
 from typing import List
-import base64
-import face_recognition
 import numpy as np
-from PIL import Image
-import io
 from uuid import UUID
+from src.config import Config
+from src.students.face_utils import decode_image, get_face_embedding, compute_distance
+from src.core.crypto import decrypt_embedding
+import logging
+
+logger = logging.getLogger(__name__)
 exam_service = ExamService()
+
+
 
 
 class ExamSessionService:
     async def verify_live_face(
-        self, live_image_base64: str, stored_embedding: List[float]
+        self, live_image_base64: str, stored_embedding: str
     ) -> bool:
-        try:
-            image_data = base64.b64decode(live_image_base64)
-        except Exception:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid base64 image data",
-            )
-
-        # 2. Convert image data to numpy array
-        try:
-            # Load image from bytes
-            image = Image.open(io.BytesIO(image_data))
-            # Convert to RGB if needed (face_recognition requires RGB)
-            if image.mode != "RGB":
-                image = image.convert("RGB")
-            # Convert PIL Image to numpy array
-            image_array = np.array(image)
-        except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid image format: {str(e)}",
-            )
-
-        # 3. Detect faces in the image
-        face_locations = face_recognition.face_locations(image_array)
-
-        if len(face_locations) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="No face detected in the image. Please ensure your face is clearly visible.",
-            )
-
-        if len(face_locations) > 1:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Multiple faces detected. Please submit an image with only your face.",
-            )
-
-        # 4. Generate face embedding
-        face_encodings = face_recognition.face_encodings(image_array, face_locations)
-
-        if len(face_encodings) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Failed to generate face encoding. Please try with a clearer image.",
-            )
-
-        # Get the live face embedding as numpy array
-        live_embedding = face_encodings[0]
-        # Convert stored embedding from list to numpy array
-        stored_embedding_array = np.array(stored_embedding)
-        # Calculate distance between embeddings
-        distance = face_recognition.face_distance(
-            [stored_embedding_array], live_embedding
-        )[0]
-      
-        threshold = 0.50
-        return distance < threshold
+        """
+        Verify a single live image against the stored averaged enrollment embedding.
+        stored_embedding is AES-256-GCM encrypted ciphertext from the DB.
+        Uses Config.FACE_SIMILARITY_THRESHOLD — never a hardcoded value.
+        """
+        decrypted = decrypt_embedding(stored_embedding)
+        image_array = decode_image(live_image_base64)
+        live_embedding = get_face_embedding(image_array)
+        stored_array = np.array(decrypted)
+        distance = compute_distance(stored_array, live_embedding)
+        return distance < Config.FACE_SIMILARITY_THRESHOLD
 
     async def start_exam(
         self,
@@ -337,57 +294,18 @@ class ExamSessionService:
         exam_session.end_time = current_time
         exam_session.status = ExamStatus.submitted
 
-        # Perform Autograding
-        await self.autograde_session(exam_session, session)
-
+        # Commit so the background worker sees the submitted state
         session.add(exam_session)
         await session.commit()
         await session.refresh(exam_session)
 
+        # Dispatch Autograding Task to Celery
+        from src.worker.tasks.grading_tasks import grade_and_notify_task
+        grade_and_notify_task.delay(str(exam_session.uid))
+
         return exam_session
 
-    async def autograde_session(self, exam_session: ExamSession, session: AsyncSession):
-        """
-        Calculate score for the session by comparing student answers to correct options.
-        """
-        from src.db.models import Question, Options, StudentAnswers
 
-        # 1. Fetch all questions for this exam
-        questions_stmt = select(Question).where(Question.exam_uid == exam_session.exam_uid)
-        result = await session.exec(questions_stmt)
-        questions = result.all()
-        total_questions = len(questions)
-
-        if total_questions == 0:
-            exam_session.score = 0
-            exam_session.score_percentage = 0
-            return
-
-        # 2. Fetch all student answers for this session
-        answers_stmt = select(StudentAnswers).where(StudentAnswers.session_uid == exam_session.uid)
-        result = await session.exec(answers_stmt)
-        student_answers = {str(a.question_uid): a.selected_option_uids for a in result.all()}
-
-        earned_marks = 0
-        total_possible_marks = sum(q.marks for q in questions)
-
-        # 3. For each question, find correct options and compare
-        for q in questions:
-            options_stmt = select(Options).where(Options.question_uid == q.uid, Options.is_correct == True)
-            result = await session.exec(options_stmt)
-            correct_option_uids = [str(o.uid) for o in result.all()]
-            
-            student_selected = student_answers.get(str(q.uid), [])
-
-            # Simple exact match check (works for single and multiple choice)
-            if set(student_selected) == set(correct_option_uids) and len(correct_option_uids) > 0:
-                earned_marks += q.marks
-
-        exam_session.score = float(earned_marks)
-        if total_possible_marks > 0:
-            exam_session.score_percentage = (earned_marks / total_possible_marks) * 100
-        else:
-            exam_session.score_percentage = 0
 
     async def validate_exam_link(self, token: str, session: AsyncSession) -> dict:
         """
@@ -607,7 +525,7 @@ class ExamSessionService:
         live_image_base64: str,
         session: AsyncSession,
     ):
-        # 1. Get enrollment and session
+        # 1. Get enrollment and session to ensure they exist and are valid
         enrollment_stmt = select(ExamEnrollment).where(ExamEnrollment.uid == student_uid)
         result = await session.exec(enrollment_stmt)
         enrollment = result.first()
@@ -623,68 +541,20 @@ class ExamSessionService:
         if not enrollment or not exam_session:
             raise HTTPException(404, "Active session not found")
 
-        # 2. Process image
-        try:
-            image_data = base64.b64decode(live_image_base64)
-            image = Image.open(io.BytesIO(image_data))
-            if image.mode != "RGB":
-                image = image.convert("RGB")
-            image_array = np.array(image)
-        except Exception:
-            raise HTTPException(400, "Invalid image data")
-
-        # 3. Detect faces
-        # Using model="hog" and upsampling once to find smaller/farther faces
-        face_locations = face_recognition.face_locations(image_array, number_of_times_to_upsample=1)
-        num_faces = len(face_locations)
-        print(f"Face check result: {num_faces} faces found")
-        
-        violation_type = None
-        face_match = True
-
-        if num_faces == 0:
-            violation_type = ViolationType.no_face
-            face_match = False
-        elif num_faces > 1:
-            violation_type = ViolationType.multiple_faces
-            face_match = False
-        else:
-            # 4. Verify Identity
-            face_encodings = face_recognition.face_encodings(image_array, face_locations)
-            if face_encodings:
-                stored_embedding = np.array(enrollment.embedding_vector)
-                distance = face_recognition.face_distance([stored_embedding], face_encodings[0])[0]
-                if distance > 0.60: # Threshold
-                    violation_type = ViolationType.face_mismatch
-                    face_match = False
-
-        # 5. Log Violation & Snapshot if needed
-        if violation_type or num_faces > 1:
-            # In a real system, we'd save the image to S3/Disk. Here we'll just log.
-            # We use the base64 as a placeholder for image_path in this demo/MVP
-            new_snapshot = Snapshot(
-                student_uid=UUID(student_uid),
-                session_uid=exam_session.uid,
-                image_path=f"data:image/jpeg;base64,{live_image_base64[:50]}...", # Truncated for DB
-                face_matches=face_match,
-                multiple_faces_detected=(num_faces > 1),
-                timestamp=datetime.now(timezone.utc),
-            )
-            session.add(new_snapshot)
-
-            new_violation = Violation(
-                student_uid=UUID(student_uid),
-                session_uid=exam_session.uid,
-                violation_type=violation_type or ViolationType.multiple_faces,
-                timestamp=datetime.now(timezone.utc),
-            )
-            session.add(new_violation)
-            await session.commit()
+        # 2. Dispatch the Heavy Face Inference to Celery
+        from src.worker.tasks.face_tasks import verify_face_task
+        verify_face_task.delay(
+            session_uid=str(exam_session.uid),
+            enrollment_uid=str(student_uid),
+            live_image_base64=live_image_base64
+        )
 
         return {
-            "status": "ok" if not violation_type else "violation",
-            "message": "Identity verified" if not violation_type else f"Violation detected: {violation_type}",
-            "violation_type": violation_type,
+            "status": "queued",
+            "message": "Face verification queued",
+            "violation_type": None,
+            "face_match": None,
+            "num_faces": None,
         }
 
     async def identify_student(
@@ -893,28 +763,3 @@ class ExamSessionService:
             ]
         }
 
-    async def send_result_to_student(self, session_uid: str, session: AsyncSession):
-        from src.auth.email import send_exam_result_email
-        from src.db.models import Exam, ExamEnrollment
-        
-        stmt = select(ExamSession, Exam, ExamEnrollment).join(
-            Exam, ExamSession.exam_uid == Exam.uid
-        ).join(
-            ExamEnrollment, ExamSession.student_uid == ExamEnrollment.uid
-        ).where(ExamSession.uid == session_uid)
-        
-        result = await session.exec(stmt)
-        row = result.first()
-        
-        if not row:
-            return None
-            
-        exam_session, exam, enrollment = row
-        
-        return {
-            "email": enrollment.email,
-            "student_name": f"{enrollment.first_name} {enrollment.last_name}",
-            "exam_title": exam.title,
-            "score": exam_session.score,
-            "percentage": exam_session.score_percentage
-        }

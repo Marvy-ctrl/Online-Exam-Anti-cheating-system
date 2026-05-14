@@ -1,7 +1,7 @@
 import uuid
 from src.auth.dependencies import AccessTokenBearer
 from src.analytics.router import access_token_bearer
-from fastapi import APIRouter, Depends, status, WebSocket, WebSocketDisconnect, BackgroundTasks, HTTPException
+from fastapi import APIRouter, Depends, status, WebSocket, WebSocketDisconnect, BackgroundTasks, HTTPException, Response, Request
 from fastapi.responses import JSONResponse
 from src.websocket import manager
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -22,6 +22,8 @@ from .schema import (
     UpdateScoreRequest,
 )
 from src.auth.email import send_exam_result_email
+from src.auth.utils import create_student_token
+from src.auth.dependencies import verify_student_session
 access_token_bearer = AccessTokenBearer()
 exam_session_router = APIRouter()
 session_service = ExamSessionService()
@@ -34,6 +36,7 @@ async def start_exam(
     exam_uid: str,
     student_uid: str,
     request_data: StartExamRequest,
+    response: Response,
     session: AsyncSession = Depends(get_session),
 ):
 
@@ -42,6 +45,23 @@ async def start_exam(
         student_uid=student_uid,
         face_image_base64=request_data.face_image,
         session=session,
+    )
+
+    # Issue HttpOnly Student Token valid for the duration of the exam
+    token = create_student_token(
+        student_uid=student_uid,
+        exam_uid=exam_uid,
+        session_uid=str(exam_session.uid),
+        duration_minutes=exam.duration_minutes
+    )
+    
+    response.set_cookie(
+        key="student_session_token",
+        value=token,
+        httponly=True,
+        secure=True,     # Must be True in prod (HTTPS)
+        samesite="lax",
+        max_age=exam.duration_minutes * 60
     )
 
     return StartExamResponse(
@@ -63,6 +83,7 @@ async def choose_options(
     question_uid: str,
     request_data: ChooseOptionsRequest,
     session: AsyncSession = Depends(get_session),
+    token_data: dict = Depends(verify_student_session),
 ):
     result = await session_service.choose_options(
         exam_session_uid=request_data.exam_session_uid,
@@ -82,9 +103,17 @@ async def choose_options(
     response_model=SubmitExamResponse,
 )
 async def submit_answers(
-    exam_uid: str, student_uid: str, session: AsyncSession = Depends(get_session)
+    exam_uid: str,
+    student_uid: str,
+    response: Response,
+    session: AsyncSession = Depends(get_session),
+    token_data: dict = Depends(verify_student_session),
 ):
     submit = await session_service.submit_exam(exam_uid, student_uid, session)
+    
+    # Clear the session token on submission
+    response.delete_cookie("student_session_token", secure=True, samesite="lax")
+    
     return SubmitExamResponse(
         message="Exam submitted successfully, You may exit the hall now",
         submitted_time=submit.end_time,
@@ -100,6 +129,7 @@ async def verify_face(
     student_uid: str,
     request_data: VerifyFaceRequest,
     session: AsyncSession = Depends(get_session),
+    token_data: dict = Depends(verify_student_session),
 ):
     result = await session_service.verify_face_loop(
         exam_uid=exam_uid,
@@ -139,6 +169,7 @@ async def get_exam_questions(
     exam_uid: str,
     student_uid: str,
     session: AsyncSession = Depends(get_session),
+    token_data: dict = Depends(verify_student_session),
 ):
     """
     Returns all questions + options (is_correct stripped) for an active student session.
@@ -162,6 +193,7 @@ async def log_violation(
     student_uid: str,
     request_data: ViolationReportRequest,
     session: AsyncSession = Depends(get_session),
+    token_data: dict = Depends(verify_student_session),
 ):
     """
     Log a browser-detected violation (tab switching, window focus loss).
@@ -257,26 +289,24 @@ async def get_session_details(
 @exam_session_router.post("/session/{session_uid}/send-result")
 async def send_result_email(
     session_uid: uuid.UUID,
-    background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
     token_details: dict = Depends(access_token_bearer),
 ):
     """
     Send the final result to the student via email.
+    Enqueues the email sending to a Celery background task.
     """
     # Note: In a production system, we should verify the admin owns the exam
-    result_data = await session_service.send_result_to_student(session_uid, session)
-    if not result_data:
+    
+    # Check if session exists
+    session_statement = select(ExamSession).where(ExamSession.uid == session_uid)
+    result = await session.exec(session_statement)
+    if not result.first():
         raise HTTPException(status_code=404, detail="Session not found")
-        
-    background_tasks.add_task(
-        send_exam_result_email,
-        to_email=result_data["email"],
-        student_name=result_data["student_name"],
-        exam_title=result_data["exam_title"],
-        score=result_data["score"],
-        percentage=result_data["percentage"]
-    )
+
+    # Enqueue to Celery
+    from src.worker.tasks.email_tasks import send_result_email_task
+    send_result_email_task.delay(str(session_uid))
     
     return {"message": "Result email queued successfully"}
 
@@ -290,7 +320,27 @@ async def exam_websocket_endpoint(
     """
     WebSocket endpoint for real-time exam monitoring.
     Handles student heartbeats and violation broadcasts.
+    Requires student_session_token cookie.
     """
+    # 1. Accept the connection first so we can close it with a custom code if needed
+    await websocket.accept()
+
+    # 2. Extract and validate the token manually since Depends() isn't straightforward for websockets
+    token = websocket.cookies.get("student_session_token")
+    if not token:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Missing token")
+        return
+
+    from src.auth.utils import decode_token
+    try:
+        token_data = decode_token(token)
+        if token_data.get("role") != "student" or token_data.get("exam_uid") != exam_uid or token_data.get("sub") != student_uid:
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid token scope")
+            return
+    except Exception as e:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid token")
+        return
+
     await manager.connect_student(websocket, student_uid)
     try:
         while True:

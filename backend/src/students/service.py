@@ -1,19 +1,20 @@
+import logging
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select
 from fastapi import HTTPException, status
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from src.db.models import ExamEnrollment
 from src.auth.utils import decode_url_safe_token
 from .schema import StudentEnrollModel
-from datetime import datetime, timezone, timedelta
+from .face_utils import decode_image, check_image_quality, get_face_embedding, average_embeddings
+from src.config import Config
+from src.core.crypto import encrypt_embedding
 from src.exams.service import ExamService
-import base64
-import face_recognition
-import numpy as np
-from PIL import Image
-import io
 
+logger = logging.getLogger(__name__)
 exam_service = ExamService()
+
+
 
 
 class StudentService:
@@ -113,94 +114,124 @@ class StudentService:
     async def register_face(
         self,
         enrollment_uid: str,
-        face_image_base64: str,
+        face_images_base64: list[str],
         session: AsyncSession,
-    ):
+    ) -> dict:
         """
-        Register student face for enrollment.
-        Processes face image, generates embedding, and updates enrollment record.
+        Register student face using multiple images.
+
+        Process:
+        1. Fetch the enrollment record and verify it hasn't already been enrolled.
+        2. For each submitted image:
+           a. Decode from base64.
+           b. Run quality checks (brightness + blur). Skip failures, log reason.
+           c. Detect exactly one face and generate a 128-d embedding.
+           d. Skip images where detection or encoding fails.
+        3. Require at least Config.FACE_ENROLLMENT_MIN_PASSING images to have passed.
+        4. Average all passing embeddings into a single representative vector.
+        5. Store the averaged vector and mark enrollment as 'enrolled'.
+
+        This approach produces a more robust face template than single-image capture,
+        significantly reducing impostor acceptance.
         """
-
-        # 1. Decode base64 image (DO THIS BEFORE DATABASE OPERATIONS)
-        try:
-            image_data = base64.b64decode(face_image_base64)
-        except Exception:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid base64 image data",
-            )
-
-        # 2. Convert image data to numpy array
-        try:
-            # Load image from bytes
-            image = Image.open(io.BytesIO(image_data))
-            # Convert to RGB if needed (face_recognition requires RGB)
-            if image.mode != "RGB":
-                image = image.convert("RGB")
-            # Convert PIL Image to numpy array
-            image_array = np.array(image)
-        except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid image format: {str(e)}",
-            )
-
-        # 3. Detect faces in the image
-        face_locations = face_recognition.face_locations(image_array)
-
-        if len(face_locations) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="No face detected in the image. Please ensure your face is clearly visible.",
-            )
-
-        if len(face_locations) > 1:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Multiple faces detected. Please submit an image with only your face.",
-            )
-
-        # 4. Generate face embedding
-        face_encodings = face_recognition.face_encodings(image_array, face_locations)
-
-        if len(face_encodings) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Failed to generate face encoding. Please try with a clearer image.",
-            )
-
-        # Convert numpy array to list for database storage
-        face_embedding = face_encodings[0].tolist()
-
-        # 5. NOW fetch enrollment record from database (AFTER processing)
+        # 1. Fetch enrollment record first
         statement = select(ExamEnrollment).where(ExamEnrollment.uid == enrollment_uid)
         result = await session.exec(statement)
         enrollment_record = result.first()
 
         if not enrollment_record:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Enrollment not found"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Enrollment not found."
             )
 
         if enrollment_record.status == "enrolled":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Face registration is already complete for this enrollment.",
+                detail="Face registration is already complete. You cannot re-enroll.",
             )
 
-        # 6. Update enrollment record with face embedding
-        enrollment_record.embedding_vector = face_embedding
-        enrollment_record.updated_at = datetime.now()
+        # 2. Process each image — quality gate + encode
+        passing_embeddings = []
+        skip_reasons = []
+
+        for idx, b64_image in enumerate(face_images_base64):
+            step_label = f"Image {idx + 1}"
+            try:
+                image_array = decode_image(b64_image)
+            except HTTPException as e:
+                skip_reasons.append(f"{step_label}: decode error — {e.detail}")
+                continue
+
+            passed, reason = check_image_quality(image_array)
+            if not passed:
+                skip_reasons.append(f"{step_label}: quality check failed — {reason}")
+                logger.info(
+                    "Face enrollment quality check failed",
+                    extra={"step": idx + 1, "reason": reason, "enrollment_uid": enrollment_uid},
+                )
+                continue
+
+            try:
+                embedding = get_face_embedding(image_array)
+                passing_embeddings.append(embedding)
+            except HTTPException as e:
+                skip_reasons.append(f"{step_label}: face detection failed — {e.detail}")
+                continue
+
+        # 3. Enforce minimum passing image requirement
+        num_passing = len(passing_embeddings)
+        if num_passing < Config.FACE_ENROLLMENT_MIN_PASSING:
+            logger.warning(
+                "Face enrollment failed: insufficient passing images",
+                extra={
+                    "enrollment_uid": enrollment_uid,
+                    "passing": num_passing,
+                    "required": Config.FACE_ENROLLMENT_MIN_PASSING,
+                },
+            )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"Only {num_passing} of {len(face_images_base64)} images passed quality "
+                    f"checks. At least {Config.FACE_ENROLLMENT_MIN_PASSING} are required. "
+                    "Please retake in a well-lit area and hold the camera steady."
+                ),
+            )
+
+        # 4. Average the passing embeddings
+        averaged_vector = average_embeddings(passing_embeddings)
+        face_embedding_list = averaged_vector.tolist()
+
+        # 5. Encrypt the embedding before storage.
+        # Only core/crypto.py may write biometric data to the database.
+        encrypted_embedding = encrypt_embedding(face_embedding_list)
+
+        # 6. Persist — store the encrypted ciphertext, NOT the plaintext vector
+        # The DB column holds the encrypted string; decryption happens at verification.
+        enrollment_record.embedding_vector = encrypted_embedding
+        enrollment_record.updated_at = datetime.now(timezone.utc)
         enrollment_record.status = "enrolled"
 
         session.add(enrollment_record)
         await session.commit()
         await session.refresh(enrollment_record)
 
+        logger.info(
+            "Face enrollment complete",
+            extra={
+                "enrollment_uid": enrollment_uid,
+                "images_submitted": len(face_images_base64),
+                "images_passed": num_passing,
+                # Never log the embedding vector itself
+            },
+        )
+
         return {
-            "message": "Face registered successfully",
+            "message": "Face registered successfully.",
             "enrollment_uid": enrollment_uid,
-            "exam_uid": enrollment_record.exam_uid,
+            "exam_uid": str(enrollment_record.exam_uid),
             "face_registered": True,
-            "embedding_vector_length": len(face_embedding),
+            "images_submitted": len(face_images_base64),
+            "images_passed_quality": num_passing,
+            "embedding_vector_length": len(face_embedding_list),
         }

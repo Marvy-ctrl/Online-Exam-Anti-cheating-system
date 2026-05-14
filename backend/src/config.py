@@ -17,8 +17,17 @@ class Settings(BaseSettings):
     CLOUDINARY_CLOUD_NAME: str
     CLOUDINARY_API_KEY: str
     CLOUDINARY_API_SECRET: str
+    # Face verification — Euclidean distance threshold.
+    # Lower = stricter. 0.40 is high-security. Read from env, never hardcoded.
+    FACE_SIMILARITY_THRESHOLD: float = 0.40
+    FACE_ENROLLMENT_MIN_PASSING: int = 3
+    # AES-256-GCM encryption key for biometric data at rest.
+    # Must be exactly 64 hex characters (32 bytes = 256 bits).
+    # Generate with: python -c "import secrets; print(secrets.token_hex(32))"
+    ENCRYPTION_KEY: str
 
     model_config = SettingsConfigDict(env_file="backend/src/.env", extra="ignore")
+
 
 
 Config = Settings()

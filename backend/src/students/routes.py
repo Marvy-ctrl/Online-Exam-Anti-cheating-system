@@ -24,12 +24,12 @@ async def register_face(
     session: AsyncSession = Depends(get_session),
 ):
     """
-    Register student face for enrollment.
-    Accepts base64-encoded face image and updates enrollment record.
+    Multi-image face enrollment endpoint.
+    Accepts 3-5 base64 images and stores a single averaged embedding.
     """
     result = await student_service.register_face(
         enrollment_uid=str(face_data.enrollment_uid),
-        face_image_base64=face_data.face_image,
+        face_images_base64=face_data.face_images,
         session=session,
     )
 

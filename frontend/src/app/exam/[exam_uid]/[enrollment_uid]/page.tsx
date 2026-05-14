@@ -62,7 +62,8 @@ export default function ExamPage() {
     const fetchData = async () => {
       try {
         const res = await fetch(
-          `${BASE_URL}/exam_session/${exam_uid}/student/${enrollment_uid}/questions`
+          `${BASE_URL}/exam_session/${exam_uid}/student/${enrollment_uid}/questions`,
+          { credentials: 'include' }
         )
         if (res.status === 409) {
           setSubmitted(true)
@@ -246,6 +247,7 @@ export default function ExamPage() {
       const res = await fetch(`${BASE_URL}/exam_session/${exam_uid}/student/${enrollment_uid}/verify-face`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ face_image: base64 }),
       })
       const data = await res.json()
@@ -276,6 +278,7 @@ export default function ExamPage() {
           const res = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify({ violation_type: 'tab_switch', count: tabSwitchCount.current }),
           })
           if (res.ok) {
@@ -296,6 +299,7 @@ export default function ExamPage() {
         const res = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify({ violation_type: 'focus_loss', count: 1 }),
         })
         if (res.ok) {
@@ -331,6 +335,7 @@ export default function ExamPage() {
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify({
               exam_session_uid: sessionUid,
               selected_option_uids: [optionUid],
@@ -357,7 +362,7 @@ export default function ExamPage() {
     try {
       const res = await fetch(
         `${BASE_URL}/exam_session/${exam_uid}/student/${enrollment_uid}/submit_answers`,
-        { method: 'POST' }
+        { method: 'POST', credentials: 'include' }
       )
       if (res.ok) {
         const data = await res.json()

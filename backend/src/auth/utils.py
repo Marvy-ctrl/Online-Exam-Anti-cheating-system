@@ -43,6 +43,23 @@ def create_access_token(
     return token
 
 
+def create_student_token(
+    student_uid: str, exam_uid: str, session_uid: str, duration_minutes: int
+) -> str:
+    """Generate a strictly scoped JWT for a student taking an exam."""
+    payload = {
+        "sub": student_uid,
+        "exam_uid": exam_uid,
+        "session_uid": session_uid,
+        "role": "student",
+        "jti": str(uuid.uuid4()),
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=duration_minutes)
+    }
+    return jwt.encode(
+        payload=payload, key=Config.JWT_SECRET, algorithm=Config.JWT_ALGORITHM
+    )
+
+
 def decode_token(token: str) -> dict:
     try:
         token_data = jwt.decode(

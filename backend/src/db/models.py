@@ -1,12 +1,11 @@
 import uuid
+import sqlalchemy as sa
 from datetime import datetime, timezone
 from typing import List, Optional
 from sqlmodel import SQLModel, Field, Column, Relationship, UniqueConstraint
-from sqlalchemy import Column, Float
+from sqlalchemy import Column, ForeignKey
 from sqlalchemy.dialects.postgresql import JSON
 import sqlalchemy.dialects.postgresql as pg
-from sqlalchemy.dialects.postgresql import ARRAY
-from sqlalchemy import ForeignKey
 from enum import Enum
 from sqlalchemy.types import TIMESTAMP
 
@@ -275,7 +274,11 @@ class ExamEnrollment(SQLModel, table=True):
     email: str = Field(index=True)
     student_id: str
     device_id: Optional[str] = Field(default=None, index=True, unique=False)
-    embedding_vector: Optional[List[float]] = Field(sa_column=Column(ARRAY(Float)))
+    embedding_vector: Optional[str] = Field(
+        default=None,
+        sa_column=Column(sa.Text, nullable=True),
+        description="AES-256-GCM encrypted 128-d face embedding. Only core/crypto.py may read or write this field.",
+    )
 
     face_s3_url: Optional[str] = Field(default=None)
     enrolled_at: datetime = Field(
