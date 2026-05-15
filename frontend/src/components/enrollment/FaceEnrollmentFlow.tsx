@@ -54,7 +54,7 @@ export function FaceEnrollmentFlow({
         ]);
 
         if (!isMounted) return;
-        setStatusText("Models loaded. Starting camera...");
+        setStatusText("Initializing camera...");
         await startCamera();
         setLoading(false);
       } catch (err) {
@@ -165,18 +165,18 @@ export function FaceEnrollmentFlow({
 
     switch (stepId) {
       case 1: // Front
-        return noseRatioX > 0.4 && noseRatioX < 0.6;
+        return noseRatioX > 0.45 && noseRatioX < 0.55 && noseRatioY > 0.4 && noseRatioY < 0.6;
       case 2: // Turn Left (looking right from camera perspective)
-        return noseRatioX > 0.6;
+        return noseRatioX < 0.35; // Loosened from 0.30
       case 3: // Turn Right (looking left from camera perspective)
-        return noseRatioX < 0.4;
+        return noseRatioX > 0.65; // Loosened from 0.70
       case 4: // Chin Up
-        return noseRatioY < 0.45; // Nose moves up relative to jaw
+        return noseRatioY < 0.38; // Loosened from 0.35
       case 5: // Smile (check mouth aspect ratio)
         const mouth = landmarks.getMouth();
         const mouthWidth = mouth[6].x - mouth[0].x;
-        const mouthHeight = mouth[9].y - mouth[3].y;
-        return mouthWidth / faceWidth > 0.4 && mouthHeight / mouthWidth < 0.3; // Wide mouth
+        // A neutral mouth is usually ~0.35-0.4 of face width. A smile stretches it.
+        return mouthWidth / faceWidth > 0.45; // Loosened from 0.50
       default:
         return false;
     }

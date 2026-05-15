@@ -23,7 +23,6 @@ import numpy as np
 from uuid import UUID
 from src.config import Config
 from src.students.face_utils import decode_image, get_face_embedding, compute_distance
-from src.core.crypto import decrypt_embedding
 import logging
 
 logger = logging.getLogger(__name__)
@@ -34,17 +33,16 @@ exam_service = ExamService()
 
 class ExamSessionService:
     async def verify_live_face(
-        self, live_image_base64: str, stored_embedding: str
+        self, live_image_base64: str, stored_embedding: List[float]
     ) -> bool:
         """
         Verify a single live image against the stored averaged enrollment embedding.
-        stored_embedding is AES-256-GCM encrypted ciphertext from the DB.
+        stored_embedding is a 128-d float array from the DB.
         Uses Config.FACE_SIMILARITY_THRESHOLD — never a hardcoded value.
         """
-        decrypted = decrypt_embedding(stored_embedding)
         image_array = decode_image(live_image_base64)
         live_embedding = get_face_embedding(image_array)
-        stored_array = np.array(decrypted)
+        stored_array = np.array(stored_embedding)
         distance = compute_distance(stored_array, live_embedding)
         return distance < Config.FACE_SIMILARITY_THRESHOLD
 
@@ -299,9 +297,10 @@ class ExamSessionService:
         await session.commit()
         await session.refresh(exam_session)
 
-        # Dispatch Autograding Task to Celery
+        # Execute grading synchronously for immediate feedback
         from src.worker.tasks.grading_tasks import grade_and_notify_task
-        grade_and_notify_task.delay(str(exam_session.uid))
+        grade_and_notify_task.apply(args=(str(exam_session.uid),))
+
 
         return exam_session
 
@@ -484,18 +483,25 @@ class ExamSessionService:
         metadata: dict,
         session: AsyncSession,
     ):
-        # 1. Get session (Ensure we cast to UUID for the query)
+        # 1. Get session (Try to be flexible with status)
+        print(f"DEBUG VIOLATION: student_uid={student_uid}, exam_uid={exam_uid}")
+        
+        # Ensure we are comparing UUID to UUID
+        s_uuid = UUID(student_uid) if isinstance(student_uid, str) else student_uid
+        e_uuid = UUID(exam_uid) if isinstance(exam_uid, str) else exam_uid
+
         session_stmt = select(ExamSession).where(
-            ExamSession.student_uid == UUID(student_uid),
-            ExamSession.exam_uid == UUID(exam_uid),
-            ExamSession.status == ExamStatus.in_progress,
+            ExamSession.student_uid == s_uuid,
+            ExamSession.exam_uid == e_uuid,
         )
         result = await session.exec(session_stmt)
         exam_session = result.first()
         
         if not exam_session:
-            print(f" No active session found for violation: student={student_uid} exam={exam_uid}")
+            print(f"❌ DATABASE ERROR: No session found for student {student_uid} in exam {exam_uid}")
             return
+
+        print(f"✅ Found session {exam_session.uid} (Status: {exam_session.status})")
 
         # 2. Record violation
         # Map frontend strings to backend Enum
@@ -509,14 +515,17 @@ class ExamSessionService:
         elif "mismatch" in v_str: v_type = ViolationType.face_mismatch
         
         new_violation = Violation(
+            uid=uuid.uuid4(),
             student_uid=UUID(student_uid),
             session_uid=exam_session.uid,
-            violation_type=v_type.value, # Explicitly use .value to match DB enum strings
+            violation_type=v_type.value if hasattr(v_type, 'value') else v_type, 
             timestamp=datetime.now(timezone.utc),
         )
         session.add(new_violation)
+        await session.flush()
         await session.commit()
-        print(f"✅ Logged {v_type.value} for session {exam_session.uid}")
+        print(f"VIOLATION SAVED: {v_type} for session {exam_session.uid}")
+        print(f" Logged {v_type.value} for session {exam_session.uid}")
 
     async def verify_face_loop(
         self,
@@ -570,11 +579,15 @@ class ExamSessionService:
         if not exam:
             raise HTTPException(404, "Exam not found")
  
+        # For student IDs, "046" is the same as "46"
+        stripped_identifier = identifier.lstrip("0") or "0"
+
         statement = select(ExamEnrollment).where(
             ExamEnrollment.exam_uid == exam_uid,
             or_(
                 ExamEnrollment.email == identifier,
                 ExamEnrollment.student_id == identifier,
+                ExamEnrollment.student_id == stripped_identifier,
             ),
         )
         result = await session.exec(statement)

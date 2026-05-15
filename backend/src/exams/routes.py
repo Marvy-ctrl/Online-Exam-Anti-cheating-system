@@ -246,7 +246,7 @@ async def pre_enroll(
     admin_only=Depends(role),
 ):
     # Role is already enforced by Depends(role) above — no inline check needed.
-    enroll = await exam_service.pre_enroll_students(student_details, exam_uid, session)
+    enroll = await exam_service.pre_enroll_students(student_details, exam_uid, session, raise_on_duplicate=True)
 
     if enroll is None:
         raise HTTPException(status_code=404, detail="Exam not found")

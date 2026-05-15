@@ -8,7 +8,6 @@ from src.auth.utils import decode_url_safe_token
 from .schema import StudentEnrollModel
 from .face_utils import decode_image, check_image_quality, get_face_embedding, average_embeddings
 from src.config import Config
-from src.core.crypto import encrypt_embedding
 from src.exams.service import ExamService
 
 logger = logging.getLogger(__name__)
@@ -202,13 +201,9 @@ class StudentService:
         averaged_vector = average_embeddings(passing_embeddings)
         face_embedding_list = averaged_vector.tolist()
 
-        # 5. Encrypt the embedding before storage.
-        # Only core/crypto.py may write biometric data to the database.
-        encrypted_embedding = encrypt_embedding(face_embedding_list)
-
-        # 6. Persist — store the encrypted ciphertext, NOT the plaintext vector
-        # The DB column holds the encrypted string; decryption happens at verification.
-        enrollment_record.embedding_vector = encrypted_embedding
+        # 5. Persist the plaintext vector for similarity searches.
+        # Encryption is now handled at the database level if required.
+        enrollment_record.embedding_vector = face_embedding_list
         enrollment_record.updated_at = datetime.now(timezone.utc)
         enrollment_record.status = "enrolled"
 

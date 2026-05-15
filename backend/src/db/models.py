@@ -8,6 +8,8 @@ from sqlalchemy.dialects.postgresql import JSON
 import sqlalchemy.dialects.postgresql as pg
 from enum import Enum
 from sqlalchemy.types import TIMESTAMP
+from sqlalchemy.types import TIMESTAMP
+
 
 
 class Admin(SQLModel, table=True):
@@ -209,6 +211,10 @@ class Exam(SQLModel, table=True):
     exam_link: Optional[str] = None
     shuffle_questions: bool = Field(default=False)
     shuffle_options: bool = Field(default=False)
+    deleted_at: Optional[datetime] = Field(
+        sa_column=Column(TIMESTAMP(timezone=True), nullable=True)
+    )
+
 
     link_start_time: Optional[datetime] = Field(
         sa_column=Column(TIMESTAMP(timezone=True), nullable=True)
@@ -274,11 +280,15 @@ class ExamEnrollment(SQLModel, table=True):
     email: str = Field(index=True)
     student_id: str
     device_id: Optional[str] = Field(default=None, index=True, unique=False)
-    embedding_vector: Optional[str] = Field(
+    embedding_vector: Optional[List[float]] = Field(
         default=None,
-        sa_column=Column(sa.Text, nullable=True),
-        description="AES-256-GCM encrypted 128-d face embedding. Only core/crypto.py may read or write this field.",
+        sa_column=Column(pg.ARRAY(sa.Float), nullable=True),
+        description="128-d face embedding vector",
     )
+    deleted_at: Optional[datetime] = Field(
+        sa_column=Column(TIMESTAMP(timezone=True), nullable=True)
+    )
+
 
     face_s3_url: Optional[str] = Field(default=None)
     enrolled_at: datetime = Field(
@@ -351,6 +361,10 @@ class Question(SQLModel, table=True):
             TIMESTAMP(timezone=True), default=lambda: datetime.now(timezone.utc)
         )
     )
+    deleted_at: Optional[datetime] = Field(
+        sa_column=Column(TIMESTAMP(timezone=True), nullable=True)
+    )
+
 
     exam: "Exam" = Relationship(back_populates="questions")
     options: List["Options"] = Relationship(
@@ -484,6 +498,8 @@ class Snapshot(SQLModel, table=True):
         sa_column=Column(pg.UUID, ForeignKey("exam_session.uid", ondelete="CASCADE"))
     )
     image_path: str
+    object_key: Optional[str] = Field(default=None, index=True)
+
     face_matches: bool = True
     multiple_faces_detected: bool = False
     timestamp: datetime = Field(
@@ -501,7 +517,7 @@ class ViolationType(str, Enum):
     multiple_faces = "Multiple Faces Detected"
     face_mismatch = "Face Mismatch"
     tab_switch = "Tab Switching"
-    focus_loss = "focus_loss"
+    focus_loss = "Focus Loss"
 
 
 class Violation(SQLModel, table=True):

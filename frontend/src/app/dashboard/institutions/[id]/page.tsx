@@ -1,7 +1,8 @@
 "use client"
 import React, { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { Building2, ChevronRight, FileText, Users, BookOpen, BarChart3, Plus, Trash2, Edit2 } from 'lucide-react'
+import { Building2, ChevronRight, FileText, Users, BookOpen, BarChart3, Plus, Trash2, Edit2, ShieldAlert, CheckCircle2, Clock3 } from 'lucide-react'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from 'recharts'
 import Link from 'next/link'
 import { apiFetch } from '@/src/lib/api'
 import CreateSubjectModal from '@/src/components/dashboard/CreateSubjectModal'
@@ -34,6 +35,35 @@ interface Student {
   student_id: string
 }
 
+interface AnalyticsOverview {
+  total_exams: number
+  total_students: number
+  total_violations: number
+  total_subjects: number
+}
+
+interface ViolationDistributionItem {
+  violation_type: string
+  count: number
+}
+
+interface ExamStatusItem {
+  status: 'Active' | 'Upcoming' | 'Closed' | string
+  count: number
+}
+
+interface TopViolatorItem {
+  name: string
+  violation_count: number
+}
+
+interface InstitutionAnalytics {
+  overview: AnalyticsOverview
+  violation_distribution: ViolationDistributionItem[]
+  exam_status_distribution: ExamStatusItem[]
+  top_violators: TopViolatorItem[]
+}
+
 type Tab = 'exams' | 'students' | 'subjects' | 'analytics'
 
 export default function InstitutionWorkspace() {
@@ -53,6 +83,8 @@ export default function InstitutionWorkspace() {
   const [exams, setExams] = useState<Exam[]>([])
   const [subjects, setSubjects] = useState<Subject[]>([])
   const [students, setStudents] = useState<Student[]>([])
+  const [analyticsData, setAnalyticsData] = useState<InstitutionAnalytics | null>(null)
+  const [loadingAnalytics, setLoadingAnalytics] = useState(false)
 
   const fetchWorkspaceData = async () => {
     setLoading(true)
@@ -81,6 +113,27 @@ export default function InstitutionWorkspace() {
       setLoading(false)
     }
   }
+
+  const fetchAnalytics = async () => {
+    if (analyticsData) return // cache for now
+    setLoadingAnalytics(true)
+    try {
+      const res = await apiFetch(`/analytics/institution/${id}`)
+      if (res.ok) {
+        setAnalyticsData(await res.json())
+      }
+    } catch (err) {
+      console.error("Failed to fetch analytics", err)
+    } finally {
+      setLoadingAnalytics(false)
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === 'analytics' && id) {
+      fetchAnalytics()
+    }
+  }, [activeTab, id])
 
   const getExamStatus = (exam: Exam) => {
     const now = new Date()
@@ -396,11 +449,154 @@ export default function InstitutionWorkspace() {
         )}
 
         {activeTab === 'analytics' && (
-           <div className="flex flex-col items-center justify-center h-48 text-center">
-            <BarChart3 size={32} className="text-slate-300 mb-2" />
-            <p className="text-slate-500 font-medium">Analytics currently unavailable</p>
-            <p className="text-sm text-slate-400">Check back after exams have been completed to see performance reports.</p>
-         </div>
+           <div className="space-y-8">
+             {loadingAnalytics ? (
+               <div className="flex flex-col items-center justify-center h-64 text-slate-400">
+                 <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+                 <p>Gathering institution insights...</p>
+               </div>
+             ) : analyticsData ? (
+               <>
+                 {/* Summary Cards */}
+                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div className="p-6 bg-slate-50 border border-slate-100 rounded-2xl">
+                      <div className="flex items-center gap-3 text-slate-500 mb-2">
+                        <FileText size={16} />
+                        <span className="text-xs font-bold uppercase tracking-wider">Total Exams</span>
+                      </div>
+                      <div className="text-3xl font-black text-slate-900">{analyticsData.overview.total_exams}</div>
+                    </div>
+                    <div className="p-6 bg-slate-50 border border-slate-100 rounded-2xl">
+                      <div className="flex items-center gap-3 text-slate-500 mb-2">
+                        <Users size={16} />
+                        <span className="text-xs font-bold uppercase tracking-wider">Students</span>
+                      </div>
+                      <div className="text-3xl font-black text-slate-900">{analyticsData.overview.total_students}</div>
+                    </div>
+                    <div className="p-6 bg-slate-50 border border-slate-100 rounded-2xl">
+                      <div className="flex items-center gap-3 text-slate-500 mb-2">
+                        <ShieldAlert size={16} className="text-red-500" />
+                        <span className="text-xs font-bold uppercase tracking-wider">Violations</span>
+                      </div>
+                      <div className="text-3xl font-black text-slate-900">{analyticsData.overview.total_violations}</div>
+                    </div>
+                    <div className="p-6 bg-slate-50 border border-slate-100 rounded-2xl">
+                      <div className="flex items-center gap-3 text-slate-500 mb-2">
+                        <BookOpen size={16} className="text-blue-500" />
+                        <span className="text-xs font-bold uppercase tracking-wider">Subjects</span>
+                      </div>
+                      <div className="text-3xl font-black text-slate-900">{analyticsData.overview.total_subjects}</div>
+                    </div>
+                 </div>
+
+                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    {/* Violation Breakdown */}
+                    <div className="bg-white p-6 border border-slate-100 rounded-2xl">
+                      <h3 className="text-sm font-bold text-slate-900 mb-6 flex items-center gap-2">
+                        <ShieldAlert size={16} className="text-red-500" />
+                        Violation Distribution
+                      </h3>
+                      {analyticsData.violation_distribution.length > 0 ? (
+                        <div className="h-64 w-full">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={analyticsData.violation_distribution}>
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                              <XAxis dataKey="violation_type" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#64748b'}} />
+                              <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#64748b'}} />
+                              <Tooltip 
+                                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                                cursor={{ fill: '#f8fafc' }}
+                              />
+                              <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={40} />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      ) : (
+                        <div className="h-64 flex items-center justify-center text-slate-400 text-sm italic">No violations recorded yet.</div>
+                      )}
+                    </div>
+
+                    {/* Exam Status */}
+                    <div className="bg-white p-6 border border-slate-100 rounded-2xl">
+                      <h3 className="text-sm font-bold text-slate-900 mb-6 flex items-center gap-2">
+                        <Clock3 size={16} className="text-blue-500" />
+                        Exam Status
+                      </h3>
+                      <div className="flex items-center gap-8">
+                         <div className="h-48 w-48">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <PieChart>
+                                <Pie
+                                  data={analyticsData.exam_status_distribution}
+                                  innerRadius={60}
+                                  outerRadius={80}
+                                  paddingAngle={5}
+                                  dataKey="count"
+                                  nameKey="status"
+                                >
+                                  {analyticsData.exam_status_distribution.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={
+                                      entry.status === 'Active' ? '#22c55e' : 
+                                      entry.status === 'Upcoming' ? '#f59e0b' : '#64748b'
+                                    } />
+                                  ))}
+                                </Pie>
+                              </PieChart>
+                            </ResponsiveContainer>
+                         </div>
+                         <div className="flex-1 space-y-4">
+                            {analyticsData.exam_status_distribution.map((item) => (
+                              <div key={item.status} className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <div className={`w-3 h-3 rounded-full ${
+                                    item.status === 'Active' ? 'bg-green-500' : 
+                                    item.status === 'Upcoming' ? 'bg-amber-500' : 'bg-slate-400'
+                                  }`} />
+                                  <span className="text-sm text-slate-600 font-medium">{item.status}</span>
+                                </div>
+                                <span className="text-sm font-bold text-slate-900">{item.count}</span>
+                              </div>
+                            ))}
+                         </div>
+                      </div>
+                    </div>
+                 </div>
+
+                 {/* Top Violators List */}
+                 <div className="bg-white p-6 border border-slate-100 rounded-2xl">
+                    <h3 className="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
+                      <CheckCircle2 size={16} className="text-blue-500" />
+                      Top Alerted Students
+                    </h3>
+                    {analyticsData.top_violators.length > 0 ? (
+                      <div className="divide-y divide-slate-50">
+                        {analyticsData.top_violators.map((v, i) => (
+                          <div key={i} className="py-3 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600 font-bold text-xs">
+                                {i + 1}
+                              </div>
+                              <span className="text-sm font-medium text-slate-700">{v.name}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">{v.violation_count} Violations</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-slate-400 text-sm italic">All students are currently in good standing.</p>
+                    )}
+                 </div>
+               </>
+             ) : (
+               <div className="flex flex-col items-center justify-center h-48 text-center">
+                  <BarChart3 size={32} className="text-slate-300 mb-2" />
+                  <p className="text-slate-500 font-medium">Failed to load analytics</p>
+                  <button onClick={fetchAnalytics} className="mt-2 text-sm text-blue-600 hover:underline">Try again</button>
+               </div>
+             )}
+          </div>
         )}
       </div>
 

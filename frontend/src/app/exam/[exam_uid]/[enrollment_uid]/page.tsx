@@ -24,6 +24,13 @@ export default function ExamPage() {
   const router = useRouter()
   const { exam_uid, enrollment_uid } = params as { exam_uid: string; enrollment_uid: string }
 
+  useEffect(() => {
+    console.log("🚀 ExamPage Mounted")
+    console.log("📍 BASE_URL:", BASE_URL)
+    console.log("🆔 Exam UID:", exam_uid)
+    console.log("🆔 Enrollment UID:", enrollment_uid)
+  }, [])
+
   const [loading, setLoading] = useState(true)
   const [examData, setExamData] = useState<ExamData | null>(null)
   const [answers, setAnswers] = useState<AnswerState>({})
@@ -190,7 +197,7 @@ export default function ExamPage() {
   useEffect(() => {
     if (!webcamStream || !videoRef.current) return
     videoRef.current.srcObject = webcamStream
-  }, [webcamStream])
+  }, [webcamStream, loading])
 
   const stopWebcam = () => {
     if (webcamStream) webcamStream.getTracks().forEach(t => t.stop())
@@ -255,9 +262,8 @@ export default function ExamPage() {
         setFaceStatus('ok')
       } else {
         setFaceStatus('warning')
-        setViolationBanner(`Face check failed: ${data.message}`)
+        // SILENT LOGGING: Send to monitor without distracting the student
         sendWsViolation(data.violation_type || 'face_check_failed', data.message)
-        setTimeout(() => setViolationBanner(''), 5000)
       }
     } catch {
       setFaceStatus('warning')
@@ -269,8 +275,7 @@ export default function ExamPage() {
     const onVisibilityChange = async () => {
       if (document.hidden) {
         tabSwitchCount.current += 1
-        setViolationBanner(`You left the exam tab — this has been noted (${tabSwitchCount.current}× detected)`)
-        setTimeout(() => setViolationBanner(''), 6000)
+
         
         try {
           const url = `${BASE_URL}/exam_session/${exam_uid}/student/${enrollment_uid}/violation`
@@ -281,17 +286,18 @@ export default function ExamPage() {
             credentials: 'include',
             body: JSON.stringify({ violation_type: 'tab_switch', count: tabSwitchCount.current }),
           })
-          if (res.ok) {
-            sendWsViolation('tab_switch', `Student switched tabs (${tabSwitchCount.current}×)`)
-          } else {
+          
+          // ALWAYS notify the monitor immediately via WebSocket, even if DB logging fails
+          sendWsViolation('tab_switch', `Student switched tabs (${tabSwitchCount.current}×)`)
+
+          if (!res.ok) {
             console.error("Failed to log tab switch (Server error):", res.status)
           }
         } catch (e) { console.error("Failed to log tab switch (Network error):", e) }
       }
     }
     const onBlur = async () => {
-      setViolationBanner('Exam window lost focus — please stay on this page')
-      setTimeout(() => setViolationBanner(''), 4000)
+
 
       try {
         const url = `${BASE_URL}/exam_session/${exam_uid}/student/${enrollment_uid}/violation`
@@ -302,9 +308,11 @@ export default function ExamPage() {
           credentials: 'include',
           body: JSON.stringify({ violation_type: 'focus_loss', count: 1 }),
         })
-        if (res.ok) {
-          sendWsViolation('focus_loss', 'Exam window lost focus')
-        } else {
+        
+        // Notify monitor immediately
+        sendWsViolation('focus_loss', 'Exam window lost focus')
+
+        if (!res.ok) {
           console.error("Failed to log focus loss (Server error):", res.status)
         }
       } catch (e) { console.error("Failed to log focus loss (Network error):", e) }

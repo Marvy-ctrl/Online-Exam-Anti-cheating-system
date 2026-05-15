@@ -17,7 +17,6 @@ from sqlalchemy.orm import Session
 
 from src.worker.celery_app import celery_app
 from src.config import Config
-from src.core.crypto import decrypt_embedding
 from src.students.face_utils import decode_image, get_face_embedding, compute_distance
 from src.db.models import (
     ExamEnrollment,
@@ -117,17 +116,8 @@ def verify_face_task(self, session_uid: str, enrollment_uid: str, live_image_bas
             _record_violation(db, session_uid, enrollment_uid, ViolationType.no_face, live_image_base64)
             return {"face_match": False, "violation_logged": True, "distance": None}
 
-        # --- Compare against stored encrypted embedding ---
-        try:
-            decrypted = decrypt_embedding(enrollment.embedding_vector)
-        except ValueError as exc:
-            logger.error(
-                "verify_face_task: decryption failed",
-                extra={"enrollment_uid": enrollment_uid, "error": type(exc).__name__},
-            )
-            raise self.retry(exc=exc)
-
-        stored_array = np.array(decrypted)
+        # --- Compare against stored embedding ---
+        stored_array = np.array(enrollment.embedding_vector)
         distance = float(compute_distance(stored_array, live_embedding))
         face_match = distance < Config.FACE_SIMILARITY_THRESHOLD
 

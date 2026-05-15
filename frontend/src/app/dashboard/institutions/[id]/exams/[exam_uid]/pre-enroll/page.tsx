@@ -53,10 +53,19 @@ export default function BulkPreEnrollPage() {
 
     setIsSubmitting(true)
     try {
-      const res = await apiFetch(`/exam/${exam_uid}/bulk-pre-enroll`, {
-        method: 'POST',
-        body: JSON.stringify({ students: validStudents })
-      })
+      let res: Response;
+      if (validStudents.length === 1) {
+        // Use single endpoint so we get the 409 Conflict error for duplicates
+        res = await apiFetch(`/exam/${exam_uid}/pre-enroll`, {
+          method: 'POST',
+          body: JSON.stringify(validStudents[0])
+        })
+      } else {
+        res = await apiFetch(`/exam/${exam_uid}/bulk-pre-enroll`, {
+          method: 'POST',
+          body: JSON.stringify({ students: validStudents })
+        })
+      }
 
       if (res.ok) {
         setSuccess(true)

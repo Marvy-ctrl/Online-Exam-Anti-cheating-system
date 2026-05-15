@@ -27,7 +27,7 @@ def verify_hash_password(password: str, hashed: str) -> bool:
 
 
 def create_access_token(
-    user_data: dict, expiry: timedelta = None, refresh: bool = False
+    user_data: dict, expiry: timedelta = None, refresh: bool = False, role: str = "admin"
 ) -> str:
     payload = {}
     payload["user"] = user_data
@@ -36,9 +36,12 @@ def create_access_token(
     )
     payload["jti"] = str(uuid.uuid4())
     payload["refresh"] = refresh
+    payload["role"] = role
+
+    secret = Config.JWT_SECRET_EXAMINER if role == "admin" else Config.JWT_SECRET_STUDENT
 
     token = jwt.encode(
-        payload=payload, key=Config.JWT_SECRET, algorithm=Config.JWT_ALGORITHM
+        payload=payload, key=secret, algorithm=Config.JWT_ALGORITHM
     )
     return token
 
@@ -56,14 +59,21 @@ def create_student_token(
         "exp": datetime.now(timezone.utc) + timedelta(minutes=duration_minutes)
     }
     return jwt.encode(
-        payload=payload, key=Config.JWT_SECRET, algorithm=Config.JWT_ALGORITHM
+        payload=payload, key=Config.JWT_SECRET_STUDENT, algorithm=Config.JWT_ALGORITHM
     )
 
 
 def decode_token(token: str) -> dict:
     try:
+        # 1. Unverified decode to determine role and select correct secret
+        unverified_payload = jwt.decode(token, options={"verify_signature": False})
+        role = unverified_payload.get("role", "admin")
+        
+        secret = Config.JWT_SECRET_EXAMINER if role == "admin" else Config.JWT_SECRET_STUDENT
+
+        # 2. Verified decode
         token_data = jwt.decode(
-            jwt=token, key=Config.JWT_SECRET, algorithms=[Config.JWT_ALGORITHM]
+            jwt=token, key=secret, algorithms=[Config.JWT_ALGORITHM]
         )
         return token_data
     except jwt.ExpiredSignatureError:
@@ -84,28 +94,26 @@ def decode_token(token: str) -> dict:
         )
 
 
-# URLSafeTimedSerializer tracks token creation time so max_age can be enforced on decode.
-serializer = URLSafeTimedSerializer(
-    secret_key=Config.JWT_SECRET, salt="email-verification"
-)
+def _get_serializer(role: str = "admin"):
+    """
+    Get a URLSafeTimedSerializer with the appropriate secret.
+    Enrollment links are typically signed by the Admin authority.
+    """
+    secret = Config.JWT_SECRET_EXAMINER if role == "admin" else Config.JWT_SECRET_STUDENT
+    return URLSafeTimedSerializer(secret_key=secret, salt="email-verification")
 
 
-def create_url_safe_token(data: dict) -> str:
-    return serializer.dumps(data)
+def create_url_safe_token(data: dict, role: str = "admin") -> str:
+    return _get_serializer(role).dumps(data)
 
 
-def decode_url_safe_token(token: str, max_age: int = ACCESS_TOKEN_EXPIRY) -> dict:
+def decode_url_safe_token(token: str, max_age: int = ACCESS_TOKEN_EXPIRY, role: str = "admin") -> dict:
     """
     Decode a URL-safe timed token.
-    Raises structured HTTP 400 errors on expiry or tampering —
-    never leaks a raw exception to the client.
-
-    Args:
-        token:   The URL-safe token string.
-        max_age: Token validity window in seconds. Defaults to ACCESS_TOKEN_EXPIRY (1 hour).
+    Raises structured HTTP 400 errors on expiry or tampering.
     """
     try:
-        return serializer.loads(token, max_age=max_age)
+        return _get_serializer(role).loads(token, max_age=max_age)
     except SignatureExpired:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

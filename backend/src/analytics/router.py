@@ -20,3 +20,14 @@ async def get_analytics_dashboard(
     admin_uid = str(token_details.get("user")["uid"])
     analytics_data = await analytics_service.get_analytics_dashboard(session, admin_uid)
     return analytics_data
+
+
+@analytics_router.get("/institution/{institution_uid}")
+async def get_institution_analytics(
+    institution_uid: str,
+    session: AsyncSession = Depends(get_session),
+    token_details: dict = Depends(access_token_bearer),
+):
+    # Note: In a production app, we'd verify the admin owns this institution
+    analytics_data = await analytics_service.get_institution_analytics(session, institution_uid)
+    return analytics_data

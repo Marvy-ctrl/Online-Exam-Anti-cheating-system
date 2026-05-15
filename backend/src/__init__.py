@@ -20,14 +20,18 @@ from src.questions.routes import questions_router
 from src.exam_session.routes import exam_session_router
 from src.institutions.router import institution_router
 from src.analytics.router import analytics_router
+from src.core.logger import configure_logging, get_logger
 from .config import Config
+
+logger = get_logger(__name__)
 
 @asynccontextmanager
 async def life_span(app: FastAPI):
-    print("Server is running")
+    configure_logging()
+    logger.info("Server is starting", version=version)
     await init_db()
     yield
-    print("Server has stopped")
+    logger.info("Server is stopping")
 
 
 version = "v1"

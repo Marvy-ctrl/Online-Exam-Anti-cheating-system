@@ -20,6 +20,8 @@ from uuid import UUID
 from sqlmodel import select, desc, and_
 from datetime import timezone, datetime, timedelta
 import uuid
+from fastapi import HTTPException
+
 
 WAT = timezone(timedelta(hours=1))
 
@@ -126,6 +128,7 @@ class ExamService:
         student_details: StudentPreEnrollModel,
         exam_uid: str,
         session: AsyncSession,
+        raise_on_duplicate: bool = False,
     ):
         exam = await self.get_an_exam(exam_uid, session)
         if not exam:
@@ -181,6 +184,10 @@ class ExamService:
                 existing.student_uid = student_record.uid
                 session.add(existing)
                 await session.commit()
+            
+            if raise_on_duplicate:
+                raise HTTPException(409, "Student is already pre-enrolled for this exam")
+                
             return existing
 
         # 4. Create Exam Enrollment

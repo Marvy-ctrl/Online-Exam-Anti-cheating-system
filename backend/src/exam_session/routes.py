@@ -21,6 +21,7 @@ from .schema import (
     ViolationReportRequest,
     UpdateScoreRequest,
 )
+from datetime import datetime, timezone
 from src.auth.email import send_exam_result_email
 from src.auth.utils import create_student_token
 from src.auth.dependencies import verify_student_session
@@ -56,11 +57,12 @@ async def start_exam(
     )
     
     response.set_cookie(
-        key="student_session_token",
+        key="exam_auth_token",
         value=token,
         httponly=True,
-        secure=True,     # Must be True in prod (HTTPS)
+        secure=False,
         samesite="lax",
+        path="/",
         max_age=exam.duration_minutes * 60
     )
 
@@ -112,7 +114,7 @@ async def submit_answers(
     submit = await session_service.submit_exam(exam_uid, student_uid, session)
     
     # Clear the session token on submission
-    response.delete_cookie("student_session_token", secure=True, samesite="lax")
+    response.delete_cookie("exam_auth_token", secure=False, samesite="lax", path="/")
     
     return SubmitExamResponse(
         message="Exam submitted successfully, You may exit the hall now",
@@ -205,6 +207,19 @@ async def log_violation(
         metadata={"count": request_data.count},
         session=session,
     )
+
+    # Broadcast to admin monitors immediately (Nested format expected by dashboard)
+    broadcast_payload = {
+        "type": "violation",
+        "violation_type": request_data.violation_type,
+        "message": f"Browser violation: {request_data.violation_type}",
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+    await manager.notify_monitor(exam_uid, {
+        "type": "student_update",
+        "student_uid": student_uid,
+        "data": json.dumps(broadcast_payload)
+    })
     return {"message": "Violation logged successfully"}
 
 
@@ -326,7 +341,7 @@ async def exam_websocket_endpoint(
     await websocket.accept()
 
     # 2. Extract and validate the token manually since Depends() isn't straightforward for websockets
-    token = websocket.cookies.get("student_session_token")
+    token = websocket.cookies.get("exam_auth_token")
     if not token:
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Missing token")
         return

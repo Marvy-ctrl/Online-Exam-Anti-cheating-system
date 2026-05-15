@@ -418,26 +418,30 @@ export default function ExamDetailWorkspace() {
     ws.onmessage = (event) => {
       try {
         const payload = JSON.parse(event.data)
+        
+        const studentUid = payload.student_uid
+        let violationData = null
+
         if (payload.type === 'student_update') {
-          const studentData = JSON.parse(payload.data)
-          if (studentData.type === 'violation') {
-            // Find student name from our list
-            const student = students.find(s => s.uid === payload.student_uid)
-            const newEvent = {
-              id: Date.now(),
-              student_name: student ? `${student.first_name} ${student.last_name}` : 'Unknown Student',
-              student_id: student?.student_id || 'N/A',
-              violation_type: studentData.violation_type,
-              timestamp: studentData.timestamp,
-              message: studentData.message || ''
-            }
-            setLiveEvents(prev => [newEvent, ...prev].slice(0, 50)) // Keep last 50
-            
-            // If we are on results tab, maybe refresh or highlight
-            if (activeTab === 'results') {
-              // Highlight logic can be added to the row rendering
-            }
+          // Format 1: Nested data string (from Student WebSocket)
+          violationData = typeof payload.data === 'string' ? JSON.parse(payload.data) : payload.data
+        } else if (payload.type === 'violation') {
+          // Format 2: Direct violation object (from API log_violation)
+          violationData = payload
+        }
+
+        if (violationData && (violationData.type === 'violation' || payload.type === 'violation')) {
+          // Find student name from our list
+          const student = students.find(s => s.uid === studentUid)
+          const newEvent = {
+            id: Date.now() + Math.random(),
+            student_name: student ? `${student.first_name} ${student.last_name}` : 'Unknown Student',
+            student_id: student?.student_id || 'N/A',
+            violation_type: violationData.violation_type || 'Unknown',
+            timestamp: violationData.timestamp || new Date().toISOString(),
+            message: violationData.message || ''
           }
+          setLiveEvents(prev => [newEvent, ...prev].slice(0, 50)) // Keep last 50
         }
       } catch (e) { console.error("Failed to parse WS message", e) }
     }

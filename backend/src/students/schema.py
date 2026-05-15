@@ -15,6 +15,13 @@ class StudentEnrollModel(BaseModel):
     embedding_vector: Optional[List[float]] = None
     face_s3_url: Optional[str] = None
 
+    @field_validator("student_id", mode="before")
+    @classmethod
+    def strip_leading_zeros(cls, v):
+        if isinstance(v, str):
+            return v.lstrip("0") or "0"
+        return v
+
 
 class StudentEnrollResponse(BaseModel):
     uid: UUID

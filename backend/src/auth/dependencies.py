@@ -129,7 +129,7 @@ async def verify_student_session(
     Dependency to verify a student's session token.
     Reads HttpOnly cookie and validates scope and URL parameters.
     """
-    token = request.cookies.get("student_session_token")
+    token = request.cookies.get("exam_auth_token")
     if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

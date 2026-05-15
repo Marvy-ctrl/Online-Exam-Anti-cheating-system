@@ -3,6 +3,7 @@ from datetime import datetime
 import uuid
 from typing import Optional
 from uuid import UUID
+from pydantic import BaseModel, field_validator
 
 
 class SubjectCreateModel(BaseModel):
@@ -86,11 +87,19 @@ class ExamUpdateModel(BaseModel):
     shuffle_options: Optional[bool] = None
 
 
+
 class StudentPreEnrollModel(BaseModel):
     first_name: str
     last_name: str
     student_id: str
     email: str
+
+    @field_validator("student_id", mode="before")
+    @classmethod
+    def strip_leading_zeros(cls, v):
+        if isinstance(v, str):
+            return v.lstrip("0") or "0"
+        return v
 
 
 class StudentPreEnrollResponseModel(BaseModel):
@@ -124,6 +133,13 @@ class StudentUpdateModel(BaseModel):
     last_name: Optional[str] = None
     email: Optional[str] = None
     student_id: Optional[str] = None
+
+    @field_validator("student_id", mode="before")
+    @classmethod
+    def strip_leading_zeros(cls, v):
+        if isinstance(v, str):
+            return v.lstrip("0") or "0"
+        return v
 
 class ExamInvitationModel(BaseModel):
     custom_message: Optional[str] = ""

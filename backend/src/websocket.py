@@ -10,7 +10,7 @@ class ConnectionManager:
         self.exam_monitors: Dict[str, List[WebSocket]] = {}
 
     async def connect_student(self, websocket: WebSocket, student_uid: str):
-        await websocket.accept()
+        # WebSocket is already accepted in the route handler
         if student_uid not in self.active_student_connections:
             self.active_student_connections[student_uid] = []
         self.active_student_connections[student_uid].append(websocket)
