@@ -14,6 +14,7 @@ interface ExamData {
   student_last_name: string
   student_id: string
   saved_answers: Record<string, string[]>
+  expected_end_time?: string
 }
 
 type AnswerState = Record<string, string>   // question_uid → selected option_uid
@@ -94,7 +95,7 @@ export default function ExamPage() {
         setAnswers(restored)
 
         // Fetch session expected_end_time
-        await fetchSessionTiming(data.session_uid)
+        await fetchSessionTiming(data.session_uid, data.expected_end_time)
       } catch (e) {
         setError('Failed to connect to the exam server.')
       } finally {
@@ -104,21 +105,16 @@ export default function ExamPage() {
     fetchData()
   }, [exam_uid, enrollment_uid])
 
-  const fetchSessionTiming = async (sessionUid: string) => {
-    // Start timer: re-call start and read expected_end_time from response cookie/body
-    // We stored expected_end_time from start — use a workaround by re-fetching questions
-    // and checking if session is still active. Actual end time: we'll derive from
-    // calling the start endpoint again — but since session exists, it returns 409.
-    // Instead we compute from the initial start call. Since we can't re-call start,
-    // we check session info from the questions response.
-    // The timer is set client-side using expected_end_time from initial start.
-    // If page is refreshed, we lose expected_end_time — so we use current time + remaining.
-    // For now: we store expected_end_time in sessionStorage on first start.
+  const fetchSessionTiming = async (sessionUid: string, serverExpectedEndTime?: string) => {
+    if (serverExpectedEndTime) {
+      expectedEndRef.current = new Date(serverExpectedEndTime)
+      return
+    }
+    // Fallback to sessionStorage
     const stored = sessionStorage.getItem(`exam_end_${exam_uid}_${enrollment_uid}`)
     if (stored) {
       expectedEndRef.current = new Date(stored)
     }
-    // If not stored, we can't recover end time without a new endpoint — timer will be null
   }
 
   // ─── Timer ───────────────────────────────────────────────────────────────
@@ -260,6 +256,9 @@ export default function ExamPage() {
       const data = await res.json()
       if (data.status === 'ok') {
         setFaceStatus('ok')
+      } else if (data.status === 'queued') {
+        // Background task is running, don't flag as warning or send violation
+        setFaceStatus('checking')
       } else {
         setFaceStatus('warning')
         // SILENT LOGGING: Send to monitor without distracting the student
@@ -284,6 +283,7 @@ export default function ExamPage() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
+            keepalive: true,
             body: JSON.stringify({ violation_type: 'tab_switch', count: tabSwitchCount.current }),
           })
           
@@ -306,6 +306,7 @@ export default function ExamPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
+          keepalive: true,
           body: JSON.stringify({ violation_type: 'focus_loss', count: 1 }),
         })
         

@@ -20,10 +20,12 @@ from fastapi import status
 from datetime import datetime, timezone, timedelta
 from typing import List
 import numpy as np
+import uuid
 from uuid import UUID
 from src.config import Config
 from src.students.face_utils import decode_image, get_face_embedding, compute_distance
 import logging
+import random
 
 logger = logging.getLogger(__name__)
 exam_service = ExamService()
@@ -403,6 +405,16 @@ class ExamSessionService:
                 detail="This exam has already been submitted.",
             )
 
+        # 1.5 Fetch Exam settings
+        exam_stmt = select(Exam).where(Exam.uid == exam_uid)
+        exam_result = await session.exec(exam_stmt)
+        exam = exam_result.first()
+        if not exam:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Exam not found.",
+            )
+
         # 2. Fetch questions ordered by order_index
         from src.db.models import Options as OptionsModel
         questions_stmt = (
@@ -411,7 +423,12 @@ class ExamSessionService:
             .order_by(Question.order_index)
         )
         result = await session.exec(questions_stmt)
-        questions = result.all()
+        questions = list(result.all())
+
+        if exam.shuffle_questions:
+            seed_str = f"{student_uid}-{exam_uid}"
+            rng = random.Random(seed_str)
+            rng.shuffle(questions)
 
         # 3. Fetch all options for these exam questions (strip is_correct)
         question_uids = [str(q.uid) for q in questions]
@@ -433,9 +450,14 @@ class ExamSessionService:
                 "order_index": opt.order_index,
             })
 
-        # Sort options within each question
+        # Sort or Shuffle options within each question
         for key in options_by_question:
-            options_by_question[key].sort(key=lambda x: x["order_index"])
+            if exam.shuffle_options:
+                seed_str = f"{student_uid}-{key}"
+                rng = random.Random(seed_str)
+                rng.shuffle(options_by_question[key])
+            else:
+                options_by_question[key].sort(key=lambda x: x["order_index"])
 
         # 4. Build questions list
         questions_out = []
@@ -468,6 +490,7 @@ class ExamSessionService:
         return {
             "exam_uid": str(exam_uid),
             "session_uid": str(exam_session.uid),
+            "expected_end_time": exam_session.expected_end_time,
             "questions": questions_out,
             "student_first_name": enrollment.first_name if enrollment else "",
             "student_last_name": enrollment.last_name if enrollment else "",
@@ -667,6 +690,11 @@ class ExamSessionService:
         from sqlalchemy import func
         from src.db.models import Violation
 
+        # Get total marks
+        q_stmt = select(func.sum(Question.marks)).where(Question.exam_uid == UUID(exam_uid))
+        q_res = await session.exec(q_stmt)
+        total_marks = q_res.first() or 0
+
         # Fetch all sessions for this exam
         stmt = (
             select(ExamSession, ExamEnrollment)
@@ -711,6 +739,7 @@ class ExamSessionService:
                 "email": enrollment.email,
                 "status": exam_session.status.value if hasattr(exam_session.status, 'value') else str(exam_session.status),
                 "score": exam_session.score,
+                "total_marks": total_marks,
                 "score_percentage": exam_session.score_percentage,
                 "adjustment_reason": exam_session.adjustment_reason,
                 "violation_count": len(violations),
@@ -747,6 +776,12 @@ class ExamSessionService:
         s_stmt = select(Snapshot).where(Snapshot.session_uid == exam_session.uid).order_by(Snapshot.timestamp)
         s_res = await session.exec(s_stmt)
         snapshots = s_res.all()
+
+        # 4. Fetch total marks
+        from sqlalchemy import func
+        q_count_stmt = select(func.sum(Question.marks)).where(Question.exam_uid == exam_session.exam_uid)
+        q_res = await session.exec(q_count_stmt)
+        total_marks = q_res.first() or 0
         
         return {
             "session_uid": str(exam_session.uid),
@@ -757,6 +792,7 @@ class ExamSessionService:
             "end_time": exam_session.end_time.isoformat() if exam_session.end_time else None,
             "status": exam_session.status.value if hasattr(exam_session.status, 'value') else str(exam_session.status),
             "score": exam_session.score,
+            "total_marks": total_marks,
             "score_percentage": exam_session.score_percentage,
             "adjustment_reason": exam_session.adjustment_reason,
             "violations": [

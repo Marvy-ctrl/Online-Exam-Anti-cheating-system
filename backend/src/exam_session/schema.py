@@ -76,6 +76,7 @@ class QuestionResponse(BaseModel):
 class ExamQuestionsResponse(BaseModel):
     exam_uid: str
     session_uid: str
+    expected_end_time: Optional[datetime] = None
     questions: List[QuestionResponse]
     student_first_name: str
     student_last_name: str

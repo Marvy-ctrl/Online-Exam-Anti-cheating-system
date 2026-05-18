@@ -2,14 +2,14 @@
 import React, { useState } from "react";
 import { useParams } from "next/navigation";
 import { CheckCircle } from "lucide-react";
-import { FaceEnrollmentFlow } from "@/src/components/enrollment/FaceEnrollmentFlow";
+import { FaceEnrollmentFlow, FaceEnrollmentSuccessData } from "@/src/components/enrollment/FaceEnrollmentFlow";
 
 export default function FaceRegistrationPage() {
   const params = useParams();
   const enrollmentUid = params.uid as string;
   const [success, setSuccess] = useState(false);
 
-  const handleSuccess = (data: any) => {
+  const handleSuccess = (data: FaceEnrollmentSuccessData) => {
     if (data.exam_uid) {
       // Track enrolled exams list
       const enrolledExams = JSON.parse(

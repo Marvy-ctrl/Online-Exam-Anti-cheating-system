@@ -46,13 +46,14 @@ interface AuditDetails {
   end_time: string | null
   status: string
   score: number | null
+  total_marks: number
   score_percentage: number | null
   adjustment_reason: string | null
   violations: Violation[]
   snapshots: Snapshot[]
 }
 
-// type Severity = 'critical' | 'high' | 'medium'
+type Severity = 'critical' | 'high' | 'medium'
 
 interface ViolationConfig {
   label: string
@@ -62,11 +63,11 @@ interface ViolationConfig {
   borderColor: string
   badgeBg: string
   badgeText: string
-  // severity: Severity
+  severity: Severity
 }
 
 const VIOLATION_CONFIG: Record<string, ViolationConfig> = {
-  'No Face Detected': {
+  'no_face': {
     label: 'No Face Detected',
     icon: <EyeOff size={14} />,
     textColor: 'text-orange-600',
@@ -74,9 +75,9 @@ const VIOLATION_CONFIG: Record<string, ViolationConfig> = {
     borderColor: 'border-red-200',
     badgeBg: 'bg-red-100',
     badgeText: 'text-red-700',
-    // severity: 'high',
+    severity: 'high',
   },
-  'Multiple Faces Detected': {
+  'multiple_faces': {
     label: 'Multiple Faces',
     icon: <Users size={14} />,
     textColor: 'text-red-600',
@@ -84,9 +85,9 @@ const VIOLATION_CONFIG: Record<string, ViolationConfig> = {
     borderColor: 'border-red-200',
     badgeBg: 'bg-red-100',
     badgeText: 'text-red-700',
-    // severity: 'critical',
+    severity: 'critical',
   },
-  'Face Mismatch': {
+  'face_mismatch': {
     label: 'Face Mismatch',
     icon: <Fingerprint size={14} />,
     textColor: 'text-rose-600',
@@ -94,9 +95,9 @@ const VIOLATION_CONFIG: Record<string, ViolationConfig> = {
     borderColor: 'border-red-200',
     badgeBg: 'bg-rose-100',
     badgeText: 'text-rose-700',
-    // severity: 'critical',
+    severity: 'critical',
   },
-  'Tab Switching': {
+  'tab_switch': {
     label: 'Tab Switching',
     icon: <Shuffle size={14} />,
     textColor: 'text-yellow-700',
@@ -104,9 +105,9 @@ const VIOLATION_CONFIG: Record<string, ViolationConfig> = {
     borderColor: 'border-red-200',
     badgeBg: 'bg-yellow-100',
     badgeText: 'text-yellow-800',
-    // severity: 'medium',
+    severity: 'medium',
   },
-  'Window Focus Lost': {
+  'focus_loss': {
     label: 'Focus Lost',
     icon: <Monitor size={14} />,
     textColor: 'text-amber-700',
@@ -114,7 +115,7 @@ const VIOLATION_CONFIG: Record<string, ViolationConfig> = {
     borderColor: 'border-red-200',
     badgeBg: 'bg-amber-100',
     badgeText: 'text-amber-800',
-    // severity: 'medium',
+    severity: 'medium',
   },
 }
 
@@ -127,15 +128,15 @@ function getConfig(type: string): ViolationConfig {
     borderColor: 'border-red-200',
     badgeBg: 'bg-red-100',
     badgeText: 'text-red-700',
-    // severity: 'high',
+    severity: 'high',
   }
 }
 
-// const SEVERITY_BADGE: Record<Severity, string> = {
-//   critical: 'bg-red-100 text-red-700',
-//   high: 'bg-orange-100 text-orange-700',
-//   medium: 'bg-yellow-100 text-yellow-700',
-// }
+const SEVERITY_BADGE: Record<Severity, string> = {
+  critical: 'bg-red-100 text-red-700',
+  high: 'bg-orange-100 text-orange-700',
+  medium: 'bg-yellow-100 text-yellow-700',
+}
 
 export default function SessionAuditPage() {
   const params = useParams()
@@ -326,8 +327,8 @@ export default function SessionAuditPage() {
             {[
               {
                 label: 'Score',
-                value: auditDetails.score !== null ? `${auditDetails.score}` : '--',
-                sub: auditDetails.score_percentage !== null ? `${auditDetails.score_percentage.toFixed(1)}%` : '',
+                value: auditDetails.score !== null ? `${auditDetails.score} / ${auditDetails.total_marks || 0}` : '--',
+                sub: '',
                 icon: <TrendingUp size={13} className="text-blue-500" />,
                 accent: 'border-slate-200',
               },
@@ -489,8 +490,9 @@ export default function SessionAuditPage() {
                               <div className="flex items-start justify-between gap-4">
                                 <div>
                                   <div className="flex items-center gap-2 mb-1">
-                                    <span className={`text-sm font-bold ${cfg.textColor}`}>{v.type}</span>
-                                    <span className={`text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full `}>
+                                    <span className={`text-sm font-bold ${cfg.textColor}`}>{cfg.label}</span>
+                                    <span className={`text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${SEVERITY_BADGE[cfg.severity]}`}>
+                                      {cfg.severity}
                                     </span>
                                   </div>
                                   <p className="text-xs text-slate-500 leading-relaxed">

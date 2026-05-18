@@ -513,11 +513,11 @@ class Snapshot(SQLModel, table=True):
 
 
 class ViolationType(str, Enum):
-    no_face = "No Face Detected"
-    multiple_faces = "Multiple Faces Detected"
-    face_mismatch = "Face Mismatch"
-    tab_switch = "Tab Switching"
-    focus_loss = "Focus Loss"
+    no_face = "no_face"
+    multiple_faces = "multiple_faces"
+    face_mismatch = "face_mismatch"
+    tab_switch = "tab_switch"
+    focus_loss = "focus_loss"
 
 
 class Violation(SQLModel, table=True):

@@ -197,11 +197,14 @@ def send_exam_result_email(
     student_name: str,
     exam_title: str,
     score: float,
-    percentage: float,
+    total_score: float,
 ) -> None:
     """
     Send the exam result to a student after examiner review.
     """
+    score_str = f"{int(score)}" if score.is_integer() else f"{score:.1f}"
+    total_str = f"{int(total_score)}" if total_score.is_integer() else f"{total_score:.1f}"
+
     html = f"""
     <!DOCTYPE html>
     <html>
@@ -212,8 +215,8 @@ def send_exam_result_email(
 
         <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 25px; margin: 25px 0; text-align: center;">
             <p style="margin: 0; font-size: 14px; color: #166534; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em;">Your Final Score</p>
-            <p style="margin: 10px 0; font-size: 48px; color: #10b981; font-weight: 800;">{percentage:.1f}%</p>
-            <p style="margin: 0; font-size: 16px; color: #15803d;">({score} marks awarded)</p>
+            <p style="margin: 10px 0; font-size: 48px; color: #10b981; font-weight: 800;">{score_str} / {total_str}</p>
+            <p style="margin: 0; font-size: 14px; color: #15803d;">marks awarded</p>
         </div>
 
 
@@ -227,7 +230,4 @@ def send_exam_result_email(
     </body>
     </html>
     """
-    try:
-        send_email(to_email, f"Results Released: {exam_title}", html)
-    except Exception as e:
-        print(f"Failed to send result email to {to_email}: {e}")
+    send_email(to_email, f"Results Released: {exam_title}", html)

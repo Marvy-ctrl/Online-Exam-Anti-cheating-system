@@ -5,20 +5,31 @@ import * as faceapi from "face-api.js";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { ENROLLMENT_STEPS, StepProgress } from "./StepProgress";
 
+export interface FaceEnrollmentSuccessData {
+  message?: string;
+  enrollment_uid?: string;
+  exam_uid?: string;
+  face_registered?: boolean;
+  images_submitted?: number;
+  images_passed_quality?: number;
+  embedding_vector_length?: number;
+}
+
 interface FaceEnrollmentFlowProps {
   enrollmentUid: string;
-  onSuccess: (data: any) => void;
+  onSuccess: (data: FaceEnrollmentSuccessData) => void;
   onError: (msg: string) => void;
 }
 
 export function FaceEnrollmentFlow({
   enrollmentUid,
   onSuccess,
+  onError,
 }: FaceEnrollmentFlowProps) {
   // State for steps
   const [currentStepId, setCurrentStepId] = useState<number>(1);
   const [capturedImages, setCapturedImages] = useState<string[]>([]);
-  const [loading, setLoading] = useState<boolean>(true); // Initial loading for models
+  const [loading, setLoading] = useState<boolean>(true);
   const [statusText, setStatusText] = useState<string>(
     "Loading face detection models...",
   );
@@ -29,14 +40,32 @@ export function FaceEnrollmentFlow({
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const requestRef = useRef<number>();
+  const requestRef = useRef<number | undefined>(undefined);
   const lastCaptureTimeRef = useRef<number>(0);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  // Refs to hold latest values so the animation-frame loop never reads stale closures
+  const currentStepRef = useRef<number>(1);
+  const submittingRef = useRef<boolean>(false);
+  const capturedImagesRef = useRef<string[]>([]);
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    currentStepRef.current = currentStepId;
+  }, [currentStepId]);
+
+  useEffect(() => {
+    submittingRef.current = submitting;
+  }, [submitting]);
+
+  useEffect(() => {
+    capturedImagesRef.current = capturedImages;
+  }, [capturedImages]);
 
   // Constants
   const MIN_BRIGHTNESS = 80;
-  const CAPTURE_COOLDOWN = 2000; // 2 seconds between captures
+  const CAPTURE_COOLDOWN = 2000;
 
-  // Model URLs - using jsdelivr CDN since we couldn't download them locally reliably
   const MODEL_URL = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/";
 
   // Initialize
@@ -47,7 +76,6 @@ export function FaceEnrollmentFlow({
       try {
         setLoading(true);
         setStatusText("Loading face detection models...");
-        // Load tiny face detector and landmarks models from CDN
         await Promise.all([
           faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
           faceapi.nets.faceLandmark68TinyNet.loadFromUri(MODEL_URL),
@@ -60,9 +88,9 @@ export function FaceEnrollmentFlow({
       } catch (err) {
         console.error("Initialization error:", err);
         if (isMounted) {
-          setErrorMsg(
-            "Failed to initialize camera or load models. Please check permissions and connection.",
-          );
+          const msg = "Failed to initialize camera or load models. Please check permissions and connection.";
+          setErrorMsg(msg);
+          onError(msg);
           setLoading(false);
         }
       }
@@ -75,6 +103,9 @@ export function FaceEnrollmentFlow({
       stopCamera();
       if (requestRef.current) {
         cancelAnimationFrame(requestRef.current);
+      }
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
       }
     };
   }, []);
@@ -91,12 +122,13 @@ export function FaceEnrollmentFlow({
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        // The onPlay event on the video will trigger the detection loop
       }
       setErrorMsg(null);
     } catch (err) {
       console.error("Camera error:", err);
-      setErrorMsg("Unable to access camera. Please allow camera permissions.");
+      const msg = "Unable to access camera. Please allow camera permissions.";
+      setErrorMsg(msg);
+      onError(msg);
     }
   };
 
@@ -118,13 +150,11 @@ export function FaceEnrollmentFlow({
     const ctx = canvas.getContext("2d", { willReadFrequently: true });
     if (!ctx) return false;
 
-    // Draw a small scaled down version for faster calculation
     ctx.drawImage(video, 0, 0, 64, 48);
     const imageData = ctx.getImageData(0, 0, 64, 48);
     const data = imageData.data;
 
     let sum = 0;
-    // Calculate average luminance
     for (let i = 0; i < data.length; i += 4) {
       const r = data[i];
       const g = data[i + 1];
@@ -142,9 +172,6 @@ export function FaceEnrollmentFlow({
     landmarks: faceapi.FaceLandmarks68,
     stepId: number,
   ): boolean => {
-    // Basic heuristic using nose and jawline positions
-    // For a robust system, we would calculate yaw/pitch properly
-
     const nose = landmarks.getNose();
     const jaw = landmarks.getJawOutline();
 
@@ -155,41 +182,37 @@ export function FaceEnrollmentFlow({
     const topJawY = (jaw[0].y + jaw[16].y) / 2;
     const bottomJawY = jaw[8].y;
 
-    // Face width
     const faceWidth = rightJawX - leftJawX;
     const faceHeight = bottomJawY - topJawY;
 
-    // Ratios (approximate)
-    const noseRatioX = (noseBaseX - leftJawX) / faceWidth; // ~0.5 means center
-    const noseRatioY = (noseBaseY - topJawY) / faceHeight; // roughly vertical pos
+    const noseRatioX = (noseBaseX - leftJawX) / faceWidth;
+    const noseRatioY = (noseBaseY - topJawY) / faceHeight;
 
     switch (stepId) {
-      case 1: // Front
-        return noseRatioX > 0.45 && noseRatioX < 0.55 && noseRatioY > 0.4 && noseRatioY < 0.6;
-      case 2: // Turn Left (looking right from camera perspective)
-        return noseRatioX < 0.35; // Loosened from 0.30
-      case 3: // Turn Right (looking left from camera perspective)
-        return noseRatioX > 0.65; // Loosened from 0.70
-      case 4: // Chin Up
-        return noseRatioY < 0.38; // Loosened from 0.35
-      case 5: // Smile (check mouth aspect ratio)
+      case 1: // Front — centered
+        return noseRatioX > 0.42 && noseRatioX < 0.58 && noseRatioY > 0.38 && noseRatioY < 0.62;
+      case 2: // Turn Left (nose moves toward right edge from camera POV)
+        return noseRatioX < 0.40;
+      case 3: // Turn Right (nose moves toward left edge from camera POV)
+        return noseRatioX > 0.60;
+      case 4: // Chin Up (nose rises in frame)
+        return noseRatioY < 0.42;
+      case 5: { // Smile
         const mouth = landmarks.getMouth();
         const mouthWidth = mouth[6].x - mouth[0].x;
-        // A neutral mouth is usually ~0.35-0.4 of face width. A smile stretches it.
-        return mouthWidth / faceWidth > 0.45; // Loosened from 0.50
+        return mouthWidth / faceWidth > 0.42;
+      }
       default:
         return false;
     }
   };
 
-  // The detection loop
+  // The detection loop reads all live values from refs, never from the closed-over state
   const detectLoop = async () => {
-    if (
-      !videoRef.current ||
-      !canvasRef.current ||
-      currentStepId > 5 ||
-      submitting
-    ) {
+    const stepId = currentStepRef.current;
+    const isSubmitting = submittingRef.current;
+
+    if (!videoRef.current || !canvasRef.current || stepId > 5 || isSubmitting) {
       return;
     }
 
@@ -209,11 +232,13 @@ export function FaceEnrollmentFlow({
         .withFaceLandmarks(true);
 
       if (detection) {
-        setStatusText(ENROLLMENT_STEPS[currentStepId - 1].instruction);
+        const currentStepConfig = ENROLLMENT_STEPS[stepId - 1];
+        if (currentStepConfig) {
+          setStatusText(currentStepConfig.instruction);
+        }
 
-        // Quality checks
         const isBrightEnough = checkBrightness(video, canvasRef.current);
-        const isCorrectPose = checkPose(detection.landmarks, currentStepId);
+        const isCorrectPose = checkPose(detection.landmarks, stepId);
 
         const now = Date.now();
         if (
@@ -221,10 +246,9 @@ export function FaceEnrollmentFlow({
           isCorrectPose &&
           now - lastCaptureTimeRef.current > CAPTURE_COOLDOWN
         ) {
-          // All good! Capture frame
           lastCaptureTimeRef.current = now;
           captureAndProceed();
-          return; // pause detection briefly while we process
+          return;
         } else if (!isBrightEnough) {
           setStatusText("Too dark. Move to a brighter area.");
         }
@@ -242,7 +266,6 @@ export function FaceEnrollmentFlow({
     const video = videoRef.current;
     if (!video) return;
 
-    // Create a temporary canvas to get a clean high-res snapshot
     const tempCanvas = document.createElement("canvas");
     tempCanvas.width = video.videoWidth;
     tempCanvas.height = video.videoHeight;
@@ -255,14 +278,19 @@ export function FaceEnrollmentFlow({
     setCapturedImages((prev) => {
       const updated = [...prev, base64Image];
 
+      // Update the ref immediately so the next detectLoop tick sees it
+      capturedImagesRef.current = updated;
+
       if (updated.length >= 5) {
-        // We're done capturing, submit!
         submitBatch(updated);
       } else {
-        // Move to next step
-        setCurrentStepId(updated.length + 1);
-        // Resume detection after a short delay
-        setTimeout(() => {
+        const nextStep = updated.length + 1;
+        setCurrentStepId(nextStep);
+        // Update ref immediately so the rescheduled detectLoop reads the new step
+        currentStepRef.current = nextStep;
+
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        timeoutRef.current = setTimeout(() => {
           if (requestRef.current) cancelAnimationFrame(requestRef.current);
           requestRef.current = requestAnimationFrame(detectLoop);
         }, 1000);
@@ -273,6 +301,7 @@ export function FaceEnrollmentFlow({
 
   const submitBatch = async (images: string[]) => {
     setSubmitting(true);
+    submittingRef.current = true;
     setStatusText("Verifying and saving your face data...");
     stopCamera();
 
@@ -294,15 +323,17 @@ export function FaceEnrollmentFlow({
       if (res.ok) {
         onSuccess(data);
       } else {
-        setErrorMsg(
-          data.detail || "Failed to register face. Please try again.",
-        );
-        // We could offer a retry button here
+        const msg = data.detail || "Failed to register face. Please try again.";
+        setErrorMsg(msg);
+        onError(msg);
       }
     } catch (err) {
-      setErrorMsg("Network error. Please check your connection and try again.");
+      const msg = "Network error. Please check your connection and try again.";
+      setErrorMsg(msg);
+      onError(msg);
     } finally {
       setSubmitting(false);
+      submittingRef.current = false;
     }
   };
 

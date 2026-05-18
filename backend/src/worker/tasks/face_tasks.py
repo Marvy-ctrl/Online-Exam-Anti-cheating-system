@@ -14,6 +14,7 @@ from celery import Task
 from celery.utils.log import get_task_logger
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
+from fastapi import HTTPException
 
 from src.worker.celery_app import celery_app
 from src.config import Config
@@ -109,12 +110,19 @@ def verify_face_task(self, session_uid: str, enrollment_uid: str, live_image_bas
             )
             raise self.retry(exc=exc)
 
-        live_embedding = get_face_embedding(image_array)
-
-        if live_embedding is None:
-            # No face detected → log violation
-            _record_violation(db, session_uid, enrollment_uid, ViolationType.no_face, live_image_base64)
-            return {"face_match": False, "violation_logged": True, "distance": None}
+        try:
+            live_embedding = get_face_embedding(image_array)
+        except HTTPException as exc:
+            detail = str(exc.detail).lower()
+            if "no face" in detail:
+                _record_violation(db, session_uid, enrollment_uid, ViolationType.no_face, live_image_base64)
+                return {"face_match": False, "violation_logged": True, "distance": None}
+            elif "multiple faces" in detail:
+                _record_violation(db, session_uid, enrollment_uid, ViolationType.multiple_faces, live_image_base64)
+                return {"face_match": False, "violation_logged": True, "distance": None}
+            else:
+                _record_violation(db, session_uid, enrollment_uid, ViolationType.face_mismatch, live_image_base64)
+                return {"face_match": False, "violation_logged": True, "distance": None}
 
         # --- Compare against stored embedding ---
         stored_array = np.array(enrollment.embedding_vector)

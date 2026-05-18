@@ -41,6 +41,7 @@ interface ExamResult {
   email: string
   status: string
   score: number | null
+  total_marks: number
   score_percentage: number | null
   adjustment_reason: string | null
   violation_count: number
@@ -621,7 +622,7 @@ export default function ExamDetailWorkspace() {
               </h2>
 
               {!exam.enroll_link ? (
-                <div className="bg-blue-50 border border-blue-100 rounded-2xl p-6 text-center">
+                <div className=" border border-blue-100 rounded-2xl p-6 text-center">
                   <AlertCircle className="text-blue-600 mx-auto mb-3" size={32} />
                   <h3 className="font-bold text-blue-900 mb-1">No Enrollment Link Generated</h3>
                   <p className="text-blue-700 text-sm mb-6 max-w-md mx-auto">
@@ -850,7 +851,7 @@ export default function ExamDetailWorkspace() {
               </p>
 
               {!exam.exam_link ? (
-                <div className="bg-green-50 border border-green-100 rounded-2xl p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="border border-green-200 rounded-2xl p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
                   <div>
                     <h3 className="font-bold text-green-900 mb-1">No Exam Link Generated Yet</h3>
                     <p className="text-green-700 text-sm">Generate a link to allow enrolled students to enter the exam.</p>
@@ -1060,7 +1061,6 @@ export default function ExamDetailWorkspace() {
                       <tr className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                         <th className="py-3 px-4">Student</th>
                         <th className="py-3 px-4">Score</th>
-                        <th className="py-3 px-4">Percentage</th>
                         <th className="py-3 px-4">Violations</th>
                         <th className="py-3 px-4">Status</th>
                         <th className="py-3 px-4 text-right">Actions</th>
@@ -1081,16 +1081,8 @@ export default function ExamDetailWorkspace() {
                                 <div className="text-xs text-slate-400 font-mono">{res.student_id}</div>
                               </Link>
                            </td>
-                           <td className="py-3 px-4 font-bold text-slate-700">{res.score ?? '--'}</td>
-                           <td className="py-3 px-4">
-                              {res.score_percentage !== null ? (
-                                <div className="flex items-center gap-2">
-                                  <div className="w-16 bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                                    <div className="bg-blue-500 h-full" style={{ width: `${res.score_percentage}%` }}></div>
-                                  </div>
-                                  <span className="font-semibold text-slate-600">{res.score_percentage.toFixed(1)}%</span>
-                                </div>
-                              ) : '--'}
+                           <td className="py-3 px-4 font-bold text-slate-700">
+                             {res.score !== null ? `${res.score} / ${res.total_marks || 0}` : '--'}
                            </td>
                            <td className="py-3 px-4">
                               {res.violation_count > 0 ? (

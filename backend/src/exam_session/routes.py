@@ -1,11 +1,14 @@
 import uuid
+import json
 from src.auth.dependencies import AccessTokenBearer
 from src.analytics.router import access_token_bearer
 from fastapi import APIRouter, Depends, status, WebSocket, WebSocketDisconnect, BackgroundTasks, HTTPException, Response, Request
 from fastapi.responses import JSONResponse
 from src.websocket import manager
+from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.db.main import get_session
+from src.db.models import ExamSession
 from .service import ExamSessionService
 from .schema import (
     StartExamRequest,
@@ -60,8 +63,8 @@ async def start_exam(
         key="exam_auth_token",
         value=token,
         httponly=True,
-        secure=False,
-        samesite="lax",
+        secure=True,
+        samesite="none",
         path="/",
         max_age=exam.duration_minutes * 60
     )
@@ -114,7 +117,7 @@ async def submit_answers(
     submit = await session_service.submit_exam(exam_uid, student_uid, session)
     
     # Clear the session token on submission
-    response.delete_cookie("exam_auth_token", secure=False, samesite="lax", path="/")
+    response.delete_cookie("exam_auth_token", secure=True, samesite="none", path="/")
     
     return SubmitExamResponse(
         message="Exam submitted successfully, You may exit the hall now",

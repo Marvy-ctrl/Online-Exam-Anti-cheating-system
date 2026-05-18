@@ -18,6 +18,7 @@ from src.db.models import (
     ExamSession,
     Exam,
     ExamEnrollment,
+    Question,
 )
 from src.auth.email import send_exam_result_email
 
@@ -60,14 +61,23 @@ def send_result_email_task(self, session_uid: str) -> dict:
 
         student_name = f"{enrollment.first_name} {enrollment.last_name}"
         
+        # Calculate total possible marks for this exam
+        questions = db.execute(
+            select(Question).where(Question.exam_uid == exam.uid)
+        ).scalars().all()
+        total_possible_marks = sum(q.marks for q in questions) if questions else 0.0
+        
+        # Fallback helper if questions table is empty but we have a percentage
+        if total_possible_marks == 0.0 and exam_session.score_percentage and exam_session.score_percentage > 0:
+            total_possible_marks = float(round((exam_session.score / exam_session.score_percentage) * 100))
+
         try:
-            # Note: send_exam_result_email currently takes a list of emails
             send_exam_result_email(
-                emails=[enrollment.email],
+                to_email=enrollment.email,
                 student_name=student_name,
                 exam_title=exam.title,
                 score=exam_session.score,
-                percentage=exam_session.score_percentage
+                total_score=total_possible_marks
             )
             logger.info(
                 "send_result_email_task: email sent successfully",

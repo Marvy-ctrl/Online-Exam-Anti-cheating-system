@@ -16,7 +16,7 @@ interface ExamInfo {
   enrollment_uid?: string
 }
 
-type Phase = 'validating' | 'not_yet_open' | 'expired' | 'invalid' | 'identify' | 'face_capture' | 'verifying' | 'done' | 'submitted'
+type Phase = 'validating' | 'not_yet_open' | 'expired' | 'invalid' | 'identify' | 'face_capture' | 'verifying' | 'compliance' | 'done' | 'submitted'
 
 export default function ExamEntryGatePage() {
   const params = useParams()
@@ -29,6 +29,8 @@ export default function ExamEntryGatePage() {
   const [enrollmentUid, setEnrollmentUid] = useState('')
   const [identifier, setIdentifier] = useState('')
   const [isIdentifying, setIsIdentifying] = useState(false)
+  const [checkedRules, setCheckedRules] = useState(false)
+  const [checkedConsent, setCheckedConsent] = useState(false)
 
   // Countdown to exam start
   const [countdown, setCountdown] = useState('')
@@ -197,16 +199,19 @@ export default function ExamEntryGatePage() {
           `exam_end_${examInfo.exam_uid}_${enrollmentUid}`,
           data.expected_end_time
         )
-        setPhase('done')
-        setTimeout(() => {
-          router.push(`/exam/${examInfo.exam_uid}/${enrollmentUid}`)
-        }, 800)
+        setPhase('compliance')
       } else {
         const err = await res.json()
-        // If session already exists, student is reconnecting — navigate straight in
+        // If session already exists, check if student already accepted instructions once
         if (res.status === 409) {
-          setPhase('done')
-          setTimeout(() => router.push(`/exam/${examInfo.exam_uid}/${enrollmentUid}`), 800)
+          const alreadyAccepted = localStorage.getItem(`compliance_accepted_${examInfo.exam_uid}_${enrollmentUid}`)
+          if (alreadyAccepted === 'true') {
+            setPhase('done')
+            setTimeout(() => router.push(`/exam/${examInfo.exam_uid}/${enrollmentUid}`), 800)
+          } else {
+            // First time entry, but session was pre-created — show instructions!
+            setPhase('compliance')
+          }
           return
         }
         setError(err.detail || 'Face verification failed. Please try again.')
@@ -218,6 +223,22 @@ export default function ExamEntryGatePage() {
     } finally {
       setIsVerifying(false)
     }
+  }
+
+  const handleEnterExamWithFullscreen = async () => {
+    // Record that the student has read and consented to the instructions
+    localStorage.setItem(`compliance_accepted_${examInfo!.exam_uid}_${enrollmentUid}`, 'true')
+    try {
+      if (document.documentElement.requestFullscreen) {
+        await document.documentElement.requestFullscreen()
+      }
+    } catch (e) {
+      console.warn("Fullscreen request rejected or not supported:", e)
+    }
+    setPhase('done')
+    setTimeout(() => {
+      router.push(`/exam/${examInfo!.exam_uid}/${enrollmentUid}`)
+    }, 800)
   }
 
 
@@ -289,7 +310,7 @@ export default function ExamEntryGatePage() {
             <button 
               onClick={handleIdentify}
               disabled={isIdentifying || !identifier.trim()}
-              className="w-full py-4 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20 disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full py-4 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all shadow-sm shadow-blue-600/20 disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {isIdentifying ? <Loader2 size={18} className="animate-spin" /> : <>Next <ArrowRight size={18}/></>}
             </button>
@@ -305,7 +326,7 @@ export default function ExamEntryGatePage() {
   if (phase === 'submitted') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
-        <div className="w-full max-w-md bg-white rounded-2xl border border-slate-200 p-8 text-center shadow-lg">
+        <div className="w-full max-w-md bg-white rounded-2xl border border-slate-200 p-8 text-center shadow-sm">
           <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-6">
             <CheckCircle size={40} className="text-green-600" />
           </div>
@@ -366,18 +387,94 @@ export default function ExamEntryGatePage() {
     )
   }
 
+  if (phase === 'compliance' && examInfo) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 py-12">
+        <div className="w-full max-w-2xl bg-white rounded-xl border border-slate-200 shadow-sm p-8">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <h1 className="text-2xl font-bold text-slate-900 mb-2">Exam Rules & Proctoring Consent</h1>
+            <p className="text-sm text-slate-500">
+              {examInfo.exam_title} : Please read the anti-cheating guidelines carefully to prepare your secure workspace.
+            </p>
+          </div>
+
+          {/* Rules List */}
+          <div className="space-y-4 mb-8">
+            <div className="border border-slate-200 rounded-xl p-5 bg-slate-50">
+              <h3 className="font-bold text-slate-900 text-sm mb-1">1. Tab & Window Shifting</h3>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Leaving the exam tab, opening new windows, or switching applications is strictly prohibited. 
+              </p>
+            </div>
+
+            <div className="border border-slate-200 rounded-xl p-5 bg-slate-50">
+              <h3 className="font-bold text-slate-900 text-sm mb-1">2. Continuous Face Proctoring</h3>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Your webcam stream must remain active and unobstructed. The presence of multiple faces, face mismatches, or camera absence will be recorded in the proctoring timeline.
+              </p>
+            </div>
+
+            <div className="border border-slate-200 rounded-xl p-5 bg-slate-50">
+              <h3 className="font-bold text-slate-900 text-sm mb-1">3. Disconnection Policy</h3>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                In the event of a brief network outage, your answers will continue to save locally. However, persistent disconnections or closing the browser without submitting may trigger an automatic exam closure.
+              </p>
+            </div>
+          </div>
+
+          {/* Checkboxes */}
+          <div className="space-y-3 mb-8 border-t border-slate-100 pt-6">
+            <label className="flex items-start gap-3 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={checkedRules}
+                onChange={(e) => setCheckedRules(e.target.checked)}
+                className="w-4 h-4 mt-0.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 focus:ring-offset-0 focus:ring-0 accent-blue-600 outline-none cursor-pointer"
+              />
+              <span className="text-xs text-slate-600 font-medium leading-normal">
+                I have read, understood, and agree to abide by all the listed proctoring regulations.
+              </span>
+            </label>
+
+            <label className="flex items-start gap-3 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={checkedConsent}
+                onChange={(e) => setCheckedConsent(e.target.checked)}
+                className="w-4 h-4 mt-0.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 focus:ring-offset-0 focus:ring-0 accent-blue-600 outline-none cursor-pointer"
+              />
+              <span className="text-xs text-slate-600 font-medium leading-normal">
+                I understand that my presence, browser focus, and webcam snapshots will be recorded for security auditing.
+              </span>
+            </label>
+          </div>
+
+          {/* Start CTA Button */}
+          <button
+            onClick={handleEnterExamWithFullscreen}
+            disabled={!checkedRules || !checkedConsent}
+            className="w-full py-3.5 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
+          >
+            Start Secure Exam Room
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   // Face capture phase
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-blue-950 flex items-center justify-center p-4">
       <div className="w-full max-w-lg">
         {/* Header */}
         <div className="text-center mb-6">
-          <div className="w-14 h-14 rounded-xl bg-blue-600 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-600/30">
+          <div className="w-14 h-14 rounded-xl bg-blue-600 flex items-center justify-center mx-auto mb-4 shadow-sm shadow-blue-600/30">
             <ShieldCheck size={28} className="text-white" />
           </div>
           <h1 className="text-2xl font-bold text-white mb-1">Identity Verification</h1>
           <p className="text-slate-400 text-sm">
-            {examInfo?.exam_title} &mdash; {examInfo?.duration_minutes} minutes
+            {examInfo?.exam_title} - {examInfo?.duration_minutes} minutes
           </p>
         </div>
 
