@@ -26,7 +26,10 @@ from src.db.models import (
     Violation,
     ViolationType,
 )
-
+from datetime import datetime, timezone
+from src.db.models import Snapshot
+from src.core.storage import storage_service
+import uuid
 logger = get_task_logger(__name__)
 
 # Sync engine for Celery workers (Celery is synchronous; asyncpg is not safe here)
@@ -154,15 +157,31 @@ def _record_violation(
     violation_type: ViolationType,
     live_image_base64: str,
 ) -> None:
-    """Write a violation row. DB is source of truth — not the WebSocket."""
-    from datetime import datetime, timezone
-    from src.db.models import Snapshot
+    """Write a violation row. DB is source of truth , not the WebSocket."""
+  
+    snapshot_uid = uuid.uuid4()
+    try:
+        upload_res = storage_service.upload_snapshot(
+            session_uid=session_uid,
+            snapshot_uid=snapshot_uid,
+            base64_image=live_image_base64
+        )
+        image_path = upload_res["image_path"]
+        object_key = upload_res.get("object_key")
+    except Exception as e:
+        logger.error(
+            "Failed to upload snapshot, using inline fallback",
+            extra={"session_uid": session_uid, "error": str(e)}
+        )
+        image_path = f"data:image/jpeg;base64,{live_image_base64[:50]}..."
+        object_key = None
 
-    # Log Snapshot (Truncated placeholder until MinIO is set up)
     new_snapshot = Snapshot(
+        uid=snapshot_uid,
         student_uid=enrollment_uid,
         session_uid=session_uid,
-        image_path=f"data:image/jpeg;base64,{live_image_base64[:50]}...", 
+        image_path=image_path,
+        object_key=object_key,
         face_matches=(violation_type != ViolationType.face_mismatch and violation_type != ViolationType.no_face),
         multiple_faces_detected=(violation_type == ViolationType.multiple_faces),
         timestamp=datetime.now(timezone.utc),

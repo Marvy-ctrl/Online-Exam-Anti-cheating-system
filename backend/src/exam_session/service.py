@@ -26,6 +26,9 @@ from src.config import Config
 from src.students.face_utils import decode_image, get_face_embedding, compute_distance
 import logging
 import random
+from src.core.storage import storage_service
+from src.auth.utils import decode_url_safe_token
+from itsdangerous import SignatureExpired, BadSignature
 
 logger = logging.getLogger(__name__)
 exam_service = ExamService()
@@ -313,9 +316,7 @@ class ExamSessionService:
         Decode an exam entry token and return exam timing info + open/not_yet_open/expired status.
         Does NOT require student identity — timing check only.
         """
-        from src.auth.utils import decode_url_safe_token
-        from itsdangerous import SignatureExpired, BadSignature
-
+    
         try:
             # Exam tokens are long-lived (valid as long as the URL exists).
             # We validate timing against exam.start_time / exam.end_time instead of token age.
@@ -753,6 +754,7 @@ class ExamSessionService:
         """
         Fetch full details for a specific session, including all violations with timestamps.
         """
+
         # 1. Fetch Session & Enrollment
         stmt = (
             select(ExamSession, ExamEnrollment)
@@ -804,7 +806,15 @@ class ExamSessionService:
             ],
             "snapshots": [
                 {
-                    "url": s.image_path,
+                    "url": (
+                        storage_service.generate_presigned_url(s.object_key)
+                        if s.object_key
+                        else (
+                            f"{Config.DOMAIN}{s.image_path}"
+                            if s.image_path.startswith("/")
+                            else s.image_path
+                        )
+                    ),
                     "face_matches": s.face_matches,
                     "multiple_faces": s.multiple_faces_detected,
                     "time": s.timestamp.isoformat() if s.timestamp else None

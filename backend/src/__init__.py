@@ -22,6 +22,8 @@ from src.institutions.router import institution_router
 from src.analytics.router import analytics_router
 from src.core.logger import configure_logging, get_logger
 from .config import Config
+from fastapi.staticfiles import StaticFiles
+
 
 logger = get_logger(__name__)
 
@@ -37,6 +39,11 @@ async def life_span(app: FastAPI):
 version = "v1"
 app = FastAPI(lifespan=life_span, version=version)
 
+import os
+os.makedirs("uploads/snapshots", exist_ok=True)
+
+from fastapi.staticfiles import StaticFiles
+app.mount("/static", StaticFiles(directory="uploads"), name="static")
 
 
 app.add_middleware(
