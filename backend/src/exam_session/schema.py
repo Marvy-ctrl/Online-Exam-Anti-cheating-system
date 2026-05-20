@@ -95,3 +95,7 @@ class ExamLinkValidateResponse(BaseModel):
     # "open" | "not_yet_open" | "expired"
     status: str
     enrollment_uid: Optional[str] = None 
+
+
+class BulkSendResultsRequest(BaseModel):
+    session_uids: List[UUID]

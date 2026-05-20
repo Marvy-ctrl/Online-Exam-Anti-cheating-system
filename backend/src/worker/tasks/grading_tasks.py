@@ -108,9 +108,9 @@ def grade_and_notify_task(self, session_uid: str) -> dict:
             }
         )
 
-        # Enqueue the email task
-        from src.worker.tasks.email_tasks import send_result_email_task
-        send_result_email_task.delay(session_uid)
+        # Enqueue the email task (DISABLED: Email is now explicitly sent by examiner to allow review and bulk releasing)
+        # from src.worker.tasks.email_tasks import send_result_email_task
+        # send_result_email_task.delay(session_uid)
 
         return {
             "status": "graded",

@@ -508,6 +508,13 @@ class Snapshot(SQLModel, table=True):
         )
     )
 
+    violation_type: Optional[str] = Field(default=None, index=True)
+    occurrence_count: int = Field(default=1)
+    last_seen_at: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(TIMESTAMP(timezone=True), nullable=True)
+    )
+
     enrollment: "ExamEnrollment" = Relationship(back_populates="snapshots")
     session: "ExamSession" = Relationship(back_populates="snapshots")
 

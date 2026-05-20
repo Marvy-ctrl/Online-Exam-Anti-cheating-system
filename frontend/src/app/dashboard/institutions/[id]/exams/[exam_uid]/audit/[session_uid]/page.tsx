@@ -29,6 +29,9 @@ interface Snapshot {
   face_matches: boolean
   multiple_faces: boolean
   time: string
+  violation_type?: string
+  occurrence_count?: number
+  last_seen_at?: string
 }
 
 interface Violation {
@@ -148,6 +151,9 @@ export default function SessionAuditPage() {
   const [error, setError] = useState<string | null>(null)
   const [sendingEmail, setSendingEmail] = useState(false)
   const [emailSent, setEmailSent] = useState(false)
+  const [showAllSnapshots, setShowAllSnapshots] = useState(false)
+  const [showAllViolations, setShowAllViolations] = useState(false)
+
 
   useEffect(() => {
     if (!session_uid) return
@@ -475,45 +481,58 @@ export default function SessionAuditPage() {
                     <div className="absolute left-[15px] top-5 bottom-5 w-px bg-slate-100" />
 
                     <div className="space-y-4">
-                      {auditDetails.violations.map((v, idx) => {
-                        const cfg = getConfig(v.type)
-                        const time = new Date(v.time)
-                        return (
-                          <div key={idx} className="relative flex gap-5 group">
-                            {/* Dot */}
-                            <div className={`relative z-10 w-8 h-8 flex-shrink-0 rounded-full border-2 ${cfg.borderColor} ${cfg.bgColor} flex items-center justify-center mt-0.5 group-hover:scale-105 transition-transform ${cfg.textColor}`}>
-                              {cfg.icon}
-                            </div>
+                      {auditDetails.violations
+                        .slice(0, showAllViolations ? undefined : 6)
+                        .map((v, idx) => {
+                          const cfg = getConfig(v.type)
+                          const time = new Date(v.time)
+                          return (
+                            <div key={idx} className="relative flex gap-5 group">
+                              {/* Dot */}
+                              <div className={`relative z-10 w-8 h-8 flex-shrink-0 rounded-full border-2 ${cfg.borderColor} ${cfg.bgColor} flex items-center justify-center mt-0.5 group-hover:scale-105 transition-transform ${cfg.textColor}`}>
+                                {cfg.icon}
+                              </div>
 
-                            {/* Card */}
-                            <div className={`flex-1 border ${cfg.borderColor} ${cfg.bgColor} rounded-xl p-4 hover:shadow-sm transition-shadow`}>
-                              <div className="flex items-start justify-between gap-4">
-                                <div>
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <span className={`text-sm font-bold ${cfg.textColor}`}>{cfg.label}</span>
-                                    <span className={`text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${SEVERITY_BADGE[cfg.severity]}`}>
-                                      {cfg.severity}
-                                    </span>
+                              {/* Card */}
+                              <div className={`flex-1 border ${cfg.borderColor} ${cfg.bgColor} rounded-xl p-4 hover:shadow-sm transition-shadow`}>
+                                <div className="flex items-start justify-between gap-4">
+                                  <div>
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span className={`text-sm font-bold ${cfg.textColor}`}>{cfg.label}</span>
+                                      <span className={`text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${SEVERITY_BADGE[cfg.severity]}`}>
+                                        {cfg.severity}
+                                      </span>
+                                    </div>
+                                    <p className="text-xs text-slate-500 leading-relaxed">
+                                      Security violation logged.
+                                    </p>
                                   </div>
-                                  <p className="text-xs text-slate-500 leading-relaxed">
-                                    Security violation logged.
-                                  </p>
-                                </div>
-                                <div className="text-right flex-shrink-0">
-                                  <p className={`font-mono text-sm font-bold ${cfg.textColor}`}>
-                                    {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                                  </p>
-                                  <p className="text-[10px] text-slate-400 mt-0.5">
-                                    {time.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
-                                  </p>
-                                  <p className="text-[9px] text-slate-300 font-bold mt-1">{String(idx + 1).padStart(3, '0')}</p>
+                                  <div className="text-right flex-shrink-0">
+                                    <p className={`font-mono text-sm font-bold ${cfg.textColor}`}>
+                                      {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                    </p>
+                                    <p className="text-[10px] text-slate-400 mt-0.5">
+                                      {time.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
+                                    </p>
+                                    <p className="text-[9px] text-slate-300 font-bold mt-1">{String(idx + 1).padStart(3, '0')}</p>
+                                  </div>
                                 </div>
                               </div>
                             </div>
-                          </div>
-                        )
-                      })}
+                          )
+                        })}
                     </div>
+
+                    {auditDetails.violations.length > 6 && (
+                      <div className="mt-6 text-center border-t border-slate-100 pt-4">
+                        <button
+                          onClick={() => setShowAllViolations(!showAllViolations)}
+                          className="px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 hover:border-slate-300 transition-all inline-flex items-center gap-1.5 shadow-sm"
+                        >
+                          {showAllViolations ? "Show Less Events" : `Show All ${auditDetails.violations.length} Events`}
+                        </button>
+                      </div>
+                    )}
 
                    
                   </div>
@@ -544,42 +563,67 @@ export default function SessionAuditPage() {
                 No snapshots captured during this session.
               </div>
             ) : (
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                {auditDetails.snapshots.map((s, idx) => (
-                  <div key={idx} className="group relative">
-                    <div className="aspect-video rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
-                      <img 
-                        src={s.url} 
-                        alt={`Capture ${idx + 1}`} 
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
-                      {/* Status Badges */}
-                      <div className="absolute top-1.5 right-1.5 flex flex-col gap-1">
-                        {!s.face_matches && (
-                          <div className="bg-red-500 text-white p-1 rounded-md shadow-sm" title="Face Mismatch">
-                            <Fingerprint size={10} />
-                          </div>
-                        )}
-                        {s.multiple_faces && (
-                          <div className="bg-orange-500 text-white p-1 rounded-md shadow-sm" title="Multiple Faces">
-                            <Users size={10} />
+              <div>
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                  {(showAllSnapshots ? auditDetails.snapshots : auditDetails.snapshots.slice(0, 12)).map((s, idx) => (
+                    <div key={idx} className="group relative">
+                      <div className="aspect-video rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
+                        <img 
+                          src={s.url} 
+                          alt={`Capture ${idx + 1}`} 
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                        {/* Status Badges */}
+                        <div className="absolute top-1.5 right-1.5 flex flex-col gap-1">
+                          {!s.face_matches && (
+                            <div className="bg-red-500 text-white p-1 rounded-md shadow-sm" title="Face Mismatch">
+                              <Fingerprint size={10} />
+                            </div>
+                          )}
+                          {s.multiple_faces && (
+                            <div className="bg-orange-500 text-white p-1 rounded-md shadow-sm" title="Multiple Faces">
+                              <Users size={10} />
+                            </div>
+                          )}
+                        </div>
+                        {/* Occurrence count badge */}
+                        {s.occurrence_count && s.occurrence_count > 1 && (
+                          <div className="absolute top-1.5 left-1.5 bg-slate-900/80 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md backdrop-blur-sm">
+                            ×{s.occurrence_count}
                           </div>
                         )}
                       </div>
-                    </div>
-                    <div className="mt-2">
-                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">
-                        {new Date(s.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </p>
-                      <div className="flex items-center gap-1 mt-0.5">
-                        <div className={`w-1.5 h-1.5 rounded-full ${s.face_matches && !s.multiple_faces ? 'bg-green-500' : 'bg-red-500'}`} />
-                        <span className="text-[10px] font-medium text-slate-600">
-                          {s.face_matches && !s.multiple_faces ? 'Verified' : 'Flagged'}
-                        </span>
+                      <div className="mt-2">
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">
+                          First: {new Date(s.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                        {s.occurrence_count && s.occurrence_count > 1 && s.last_seen_at && (
+                          <p className="text-[9px] text-slate-400 mt-0.5">
+                            Last: {new Date(s.last_seen_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <div className={`w-1.5 h-1.5 rounded-full ${s.face_matches && !s.multiple_faces ? 'bg-green-500' : 'bg-red-500'}`} />
+                          <span className="text-[10px] font-medium text-slate-600">
+                            {s.face_matches && !s.multiple_faces ? 'Verified' : 'Flagged'}
+                            {s.occurrence_count && s.occurrence_count > 1 ? ` (${s.occurrence_count}×)` : ''}
+                          </span>
+                        </div>
                       </div>
                     </div>
+                  ))}
+                </div>
+
+                {auditDetails.snapshots.length > 8 && (
+                  <div className="mt-6 flex justify-center">
+                    <button
+                      onClick={() => setShowAllSnapshots(!showAllSnapshots)}
+                      className="px-4 py-2 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-lg transition-colors duration-150"
+                    >
+                      {showAllSnapshots ? 'Show Less Captures' : `Show All ${auditDetails.snapshots.length} Captures`}
+                    </button>
                   </div>
-                ))}
+                )}
               </div>
             )}
           </div>

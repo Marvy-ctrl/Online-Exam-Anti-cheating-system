@@ -40,10 +40,12 @@ version = "v1"
 app = FastAPI(lifespan=life_span, version=version)
 
 import os
-os.makedirs("uploads/snapshots", exist_ok=True)
+BACKEND_DIR = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+UPLOADS_DIR = os.path.join(BACKEND_DIR, "uploads")
+os.makedirs(os.path.join(UPLOADS_DIR, "snapshots"), exist_ok=True)
 
 from fastapi.staticfiles import StaticFiles
-app.mount("/static", StaticFiles(directory="uploads"), name="static")
+app.mount("/static", StaticFiles(directory=UPLOADS_DIR), name="static")
 
 
 app.add_middleware(

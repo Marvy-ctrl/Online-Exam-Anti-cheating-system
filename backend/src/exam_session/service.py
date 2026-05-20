@@ -817,7 +817,10 @@ class ExamSessionService:
                     ),
                     "face_matches": s.face_matches,
                     "multiple_faces": s.multiple_faces_detected,
-                    "time": s.timestamp.isoformat() if s.timestamp else None
+                    "time": s.timestamp.isoformat() if s.timestamp else None,
+                    "violation_type": s.violation_type,
+                    "occurrence_count": s.occurrence_count if s.occurrence_count else 1,
+                    "last_seen_at": s.last_seen_at.isoformat() if s.last_seen_at else None,
                 } for s in snapshots
             ]
         }

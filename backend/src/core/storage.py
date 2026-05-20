@@ -99,7 +99,9 @@ class StorageService:
 
         # 4. Fallback: Save to local filesystem
         # Snapshots are stored under root uploads/snapshots/
-        local_dir = os.path.join("uploads", "snapshots", session_uid)
+        backend_dir = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
+        uploads_dir = os.path.join(backend_dir, "uploads")
+        local_dir = os.path.join(uploads_dir, "snapshots", session_uid)
         os.makedirs(local_dir, exist_ok=True)
         local_filepath = os.path.join(local_dir, f"{snapshot_uid}.jpg")
         

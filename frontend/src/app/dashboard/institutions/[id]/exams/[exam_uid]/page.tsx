@@ -114,6 +114,16 @@ export default function ExamDetailWorkspace() {
   // Bulk Selection State
   const [selectedStudentUids, setSelectedStudentUids] = useState<Set<string>>(new Set())
   const [isBulkDeleting, setIsBulkDeleting] = useState(false)
+  const [selectedSessionUids, setSelectedSessionUids] = useState<Set<string>>(new Set())
+  const [isReleasingResults, setIsReleasingResults] = useState(false)
+  const [showReleaseModal, setShowReleaseModal] = useState(false)
+  const [releaseMode, setReleaseMode] = useState<'single' | 'bulk'>('bulk')
+  const [targetSessionUid, setTargetSessionUid] = useState<string | null>(null)
+  const [targetStudentName, setTargetStudentName] = useState<string | null>(null)
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+
+
+
 
   const fetchExamData = async () => {
     setLoading(true)
@@ -471,6 +481,82 @@ export default function ExamDetailWorkspace() {
     } catch (e) { alert("Error updating score") }
     finally { setIsUpdatingScore(false) }
   }
+
+  const toggleSelectSession = (uid: string) => {
+    setSelectedSessionUids(prev => {
+      const next = new Set(prev)
+      if (next.has(uid)) next.delete(uid)
+      else next.add(uid)
+      return next
+    })
+  }
+
+  const toggleSelectAllSessions = () => {
+    if (selectedSessionUids.size === results.length) {
+      setSelectedSessionUids(new Set())
+    } else {
+      setSelectedSessionUids(new Set(results.map(r => r.session_uid)))
+    }
+  }
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type })
+    setTimeout(() => setToast(null), 4000)
+  }
+
+  const handleOpenSingleRelease = (sessionUid: string, studentName: string) => {
+    setReleaseMode('single')
+    setTargetSessionUid(sessionUid)
+    setTargetStudentName(studentName)
+    setShowReleaseModal(true)
+  }
+
+  const handleOpenBulkRelease = () => {
+    setReleaseMode('bulk')
+    setShowReleaseModal(true)
+  }
+
+  const handleConfirmRelease = async () => {
+    setIsReleasingResults(true)
+    try {
+      if (releaseMode === 'bulk') {
+        const count = selectedSessionUids.size
+        const res = await apiFetch(`/exam_session/bulk-send-results`, {
+          method: 'POST',
+          body: JSON.stringify({ session_uids: Array.from(selectedSessionUids) })
+        })
+
+        if (res.ok) {
+          setSelectedSessionUids(new Set())
+          setShowReleaseModal(false)
+          showToast(`Successfully released results to ${count} student(s)!`, 'success')
+          fetchResults()
+        } else {
+          const data = await res.json()
+          showToast(data.detail || "Failed to release results.", 'error')
+        }
+      } else {
+        if (!targetSessionUid) return
+        const res = await apiFetch(`/exam_session/session/${targetSessionUid}/send-result`, {
+          method: 'POST'
+        })
+        if (res.ok) {
+          setShowReleaseModal(false)
+          showToast(`Successfully released result to ${targetStudentName}!`, 'success')
+          fetchResults()
+        } else {
+          const data = await res.json()
+          showToast(data.detail || "Failed to send result.", 'error')
+        }
+      }
+    } catch (e) {
+      showToast("Network error", 'error')
+    } finally {
+      setIsReleasingResults(false)
+    }
+  }
+
+
 
   const getExamStatus = (exam: Exam) => {
     const now = new Date()
@@ -1039,13 +1125,24 @@ export default function ExamDetailWorkspace() {
                   <h2 className="text-lg font-bold text-slate-900">Exam Results & Autograde</h2>
                   <p className="text-sm text-slate-500">View student performance and adjust marks if necessary.</p>
                 </div>
-                <button 
-                  onClick={fetchResults}
-                  className="p-2 text-slate-400 hover:text-blue-600 transition-colors"
-                  title="Refresh Results"
-                >
-                  <Calendar size={18} className={loadingResults ? "animate-spin" : ""} />
-                </button>
+                <div className="flex items-center gap-3">
+                  {selectedSessionUids.size > 0 && (
+                    <button
+                      onClick={handleOpenBulkRelease}
+                      disabled={isReleasingResults}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+                    >
+                       Release result to students ({selectedSessionUids.size})
+                    </button>
+                  )}
+                  <button 
+                    onClick={fetchResults}
+                    className="p-2 text-slate-400 hover:text-blue-600 transition-colors"
+                    title="Refresh Results"
+                  >
+                    <Calendar size={18} className={loadingResults ? "animate-spin" : ""} />
+                  </button>
+                </div>
              </div>
 
              {loadingResults ? (
@@ -1059,6 +1156,14 @@ export default function ExamDetailWorkspace() {
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                        <th className="py-3 px-4 w-10">
+                          <input 
+                            type="checkbox" 
+                            checked={selectedSessionUids.size === results.length && results.length > 0} 
+                            onChange={toggleSelectAllSessions} 
+                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                          />
+                        </th>
                         <th className="py-3 px-4">Student</th>
                         <th className="py-3 px-4">Score</th>
                         <th className="py-3 px-4">Violations</th>
@@ -1069,6 +1174,14 @@ export default function ExamDetailWorkspace() {
                     <tbody className="divide-y divide-slate-100 text-sm">
                       {results.map((res) => (
                         <tr key={res.session_uid} className="hover:bg-slate-50/50 transition-colors group">
+                           <td className="py-3 px-4">
+                             <input 
+                               type="checkbox" 
+                               checked={selectedSessionUids.has(res.session_uid)} 
+                               onChange={() => toggleSelectSession(res.session_uid)} 
+                               className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                             />
+                           </td>
                            <td className="py-3 px-4">
                               <Link 
                                 href={`/dashboard/institutions/${id}/exams/${exam_uid}/audit/${res.session_uid}`}
@@ -1118,6 +1231,12 @@ export default function ExamDetailWorkspace() {
                                 className="px-3 py-1 bg-white border border-slate-200 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-50 hover:border-blue-300 transition-all"
                               >
                                 Edit Score
+                              </button>
+                              <button
+                                onClick={() => handleOpenSingleRelease(res.session_uid, res.student_name)}
+                                className="ml-2 px-3 py-1 bg-white border border-slate-200 text-slate-600 rounded-lg text-xs hover:bg-slate-50 hover:border-blue-300 font-bold transition-all inline-flex items-center gap-1 shadow-sm shadow-blue-600/10"
+                              >
+                                 Send Result
                               </button>
                            </td>
                         </tr>
@@ -1308,6 +1427,42 @@ export default function ExamDetailWorkspace() {
            </div>
         </div>
       )}
+
+      {/* Release Results Modal */}
+      {showReleaseModal && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8 animate-in zoom-in-95 duration-200">
+              <h3 className="text-xl font-bold text-slate-900 mb-2">Release Exam Results</h3>
+              <p className="text-sm text-slate-500 mb-6">
+                {releaseMode === 'bulk' 
+                  ? `You are about to release and email the exam results to the ${selectedSessionUids.size} selected student(s). This action will dispatch official scores to all chosen candidates at once.`
+                  : `You are about to release and email the exam results to ${targetStudentName}. This action will dispatch an official score report to their registered email address.`
+                }
+              </p>
+
+              <div className="flex items-center gap-3">
+                <button 
+                  onClick={() => setShowReleaseModal(false)}
+                  className="flex-1 py-3 bg-slate-50 text-slate-600 font-bold rounded-xl hover:bg-slate-100 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={handleConfirmRelease}
+                  disabled={isReleasingResults}
+                  className="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20 disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                  {isReleasingResults ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      Releasing...
+                    </>
+                  ) : "Release Results"}
+                </button>
+              </div>
+           </div>
+        </div>
+      )}
       {/* Live Activity Feed Overlay */}
       {wsConnected && showLiveFeed && getExamStatus(exam).label === 'Active' && (
         <div className="fixed bottom-6 right-6 w-80 max-h-[400px] bg-white border border-slate-200 rounded-2xl shadow-2xl flex flex-col overflow-hidden z-40 animate-in slide-in-from-right duration-300">
@@ -1358,6 +1513,33 @@ export default function ExamDetailWorkspace() {
             </span>
           )}
         </button>
+      )}
+      {/* Toast Notification */}
+      {toast && (
+        <div
+          className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-xl border text-sm font-semibold animate-in slide-in-from-bottom-4 duration-300 ${
+            toast.type === 'success'
+              ? 'bg-white border-green-200 text-slate-800'
+              : 'bg-white border-red-200 text-slate-800'
+          }`}
+        >
+          {toast.type === 'success' ? (
+            <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+              <CheckCircle size={14} className="text-green-600" />
+            </div>
+          ) : (
+            <div className="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+              <AlertCircle size={14} className="text-red-600" />
+            </div>
+          )}
+          <span>{toast.message}</span>
+          <button
+            onClick={() => setToast(null)}
+            className="ml-2 text-slate-400 hover:text-slate-600 transition-colors flex-shrink-0"
+          >
+            <X size={14} />
+          </button>
+        </div>
       )}
     </div>
   )

@@ -257,9 +257,7 @@ export default function ExamEntryGatePage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
         <div className="w-full max-w-md bg-white rounded-2xl border border-slate-200 p-8 text-center">
-          <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-4">
-            <Clock size={32} className="text-amber-600" />
-          </div>
+         
           <h1 className="text-2xl font-bold text-slate-900 mb-2">Exam Not Yet Started</h1>
           <p className="text-slate-500 mb-6">
             <strong>{examInfo.exam_title}</strong> will open for entry at:

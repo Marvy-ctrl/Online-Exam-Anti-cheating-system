@@ -157,46 +157,85 @@ def _record_violation(
     violation_type: ViolationType,
     live_image_base64: str,
 ) -> None:
-    """Write a violation row. DB is source of truth , not the WebSocket."""
-  
-    snapshot_uid = uuid.uuid4()
-    try:
-        upload_res = storage_service.upload_snapshot(
-            session_uid=session_uid,
-            snapshot_uid=snapshot_uid,
-            base64_image=live_image_base64
-        )
-        image_path = upload_res["image_path"]
-        object_key = upload_res.get("object_key")
-    except Exception as e:
-        logger.error(
-            "Failed to upload snapshot, using inline fallback",
-            extra={"session_uid": session_uid, "error": str(e)}
-        )
-        image_path = f"data:image/jpeg;base64,{live_image_base64[:50]}..."
-        object_key = None
+    """Write a violation row and upsert the snapshot.
 
-    new_snapshot = Snapshot(
-        uid=snapshot_uid,
-        student_uid=enrollment_uid,
-        session_uid=session_uid,
-        image_path=image_path,
-        object_key=object_key,
-        face_matches=(violation_type != ViolationType.face_mismatch and violation_type != ViolationType.no_face),
-        multiple_faces_detected=(violation_type == ViolationType.multiple_faces),
-        timestamp=datetime.now(timezone.utc),
-    )
-    db.add(new_snapshot)
+    Snapshot deduplication: Only one snapshot image is stored per violation
+    type per session. Subsequent occurrences of the same violation type
+    increment ``occurrence_count`` and update ``last_seen_at`` without
+    writing a new image to storage.
+    """
+    now = datetime.now(timezone.utc)
 
+    # --- Always log the individual violation event (for the timeline) ---
     violation = Violation(
         student_uid=enrollment_uid,
         session_uid=session_uid,
         violation_type=violation_type,
-        timestamp=datetime.now(timezone.utc),
+        timestamp=now,
     )
     db.add(violation)
+
+    # --- Upsert snapshot ---
+    vtype_str = violation_type.value
+    existing_snapshot = db.execute(
+        select(Snapshot).where(
+            Snapshot.session_uid == session_uid,
+            Snapshot.violation_type == vtype_str,
+        )
+    ).scalar_one_or_none()
+
+    if existing_snapshot:
+        # Already have a reference image for this violation type — just increment.
+        existing_snapshot.occurrence_count += 1
+        existing_snapshot.last_seen_at = now
+        db.add(existing_snapshot)
+        logger.info(
+            "snapshot deduplicated — incremented count",
+            extra={
+                "session_uid": session_uid,
+                "type": vtype_str,
+                "count": existing_snapshot.occurrence_count,
+            },
+        )
+    else:
+        # First occurrence — upload the actual image.
+        snapshot_uid = uuid.uuid4()
+        try:
+            upload_res = storage_service.upload_snapshot(
+                session_uid=session_uid,
+                snapshot_uid=snapshot_uid,
+                base64_image=live_image_base64,
+            )
+            image_path = upload_res["image_path"]
+            object_key = upload_res.get("object_key")
+        except Exception as e:
+            logger.error(
+                "Failed to upload snapshot, using inline fallback",
+                extra={"session_uid": session_uid, "error": str(e)},
+            )
+            image_path = f"data:image/jpeg;base64,{live_image_base64[:50]}..."
+            object_key = None
+
+        new_snapshot = Snapshot(
+            uid=snapshot_uid,
+            student_uid=enrollment_uid,
+            session_uid=session_uid,
+            image_path=image_path,
+            object_key=object_key,
+            face_matches=(
+                violation_type not in (ViolationType.face_mismatch, ViolationType.no_face)
+            ),
+            multiple_faces_detected=(violation_type == ViolationType.multiple_faces),
+            timestamp=now,
+            violation_type=vtype_str,
+            occurrence_count=1,
+            last_seen_at=now,
+        )
+        db.add(new_snapshot)
+
     db.commit()
     logger.info(
         "violation recorded",
-        extra={"session_uid": session_uid, "type": violation_type.value},
+        extra={"session_uid": session_uid, "type": vtype_str},
     )
+

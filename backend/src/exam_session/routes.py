@@ -23,6 +23,7 @@ from .schema import (
     IdentifyStudentRequest,
     ViolationReportRequest,
     UpdateScoreRequest,
+    BulkSendResultsRequest,
 )
 from datetime import datetime, timezone
 from src.auth.email import send_exam_result_email
@@ -327,6 +328,29 @@ async def send_result_email(
     send_result_email_task.delay(str(session_uid))
     
     return {"message": "Result email queued successfully"}
+
+
+@exam_session_router.post("/bulk-send-results")
+async def bulk_send_results(
+    request_data: BulkSendResultsRequest,
+    session: AsyncSession = Depends(get_session),
+    token_details: dict = Depends(access_token_bearer),
+):
+    """
+    Send final exam results to multiple students in bulk.
+    """
+    from src.worker.tasks.email_tasks import send_result_email_task
+    
+    sent_count = 0
+    for s_uid in request_data.session_uids:
+        # Check if session exists
+        session_statement = select(ExamSession).where(ExamSession.uid == s_uid)
+        result = await session.exec(session_statement)
+        if result.first():
+            send_result_email_task.delay(str(s_uid))
+            sent_count += 1
+            
+    return {"message": f"Successfully queued {sent_count} result emails"}
 
 
 @exam_session_router.websocket("/{exam_uid}/student/{student_uid}/ws")
