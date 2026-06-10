@@ -1,6 +1,6 @@
 import React from 'react'
 import Link from 'next/link'
-import { Shield } from 'lucide-react'
+import Image from 'next/image'
 
 const links = {
   Product: ['Features', 'How it works'],
@@ -16,17 +16,18 @@ export default function Footer() {
 
           {/* Brand */}
           <div className="max-w-xs">
-            <Link href="/" className="flex items-center gap-2.5 mb-4 group">
-              <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
-                <Shield size={15} className="text-white" />
-              </div>
-              <span className="text-slate-900 font-semibold text-lg tracking-tight">
-                Exam<span className="text-blue-600">Guard</span>
-              </span>
+            <Link href="/" className="flex items-center mb-4 group">
+              <Image 
+                src="/examloc_logo.png" 
+                alt="ExamLoc Logo" 
+                width={120} 
+                height={32} 
+                className="h-8 w-auto object-contain"
+              />
             </Link>
             <p className="text-slate-500 text-sm leading-snug">
               An examination platform built for integrity.
-              Biometric verification, live AI monitoring, examiner control.
+              Identity verification, live monitoring, and examiner oversight.
             </p>
           </div>
 
@@ -56,10 +57,10 @@ export default function Footer() {
         {/* Bottom bar */}
         <div className="border-t border-slate-100 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="text-slate-400 text-xs">
-            © {new Date().getFullYear()} ExamGuard. Built for integrity.
+            © {new Date().getFullYear()} ExamLoc. Built for integrity.
           </p>
           <p className="text-slate-400 text-xs">
-            Zero Trust · Biometric · Real-time Monitored
+            Secure Exams · Violation Tracking · Examiner Oversight
           </p>
         </div>
 

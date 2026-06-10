@@ -15,6 +15,7 @@ import {
   X
 } from 'lucide-react'
 import { apiFetch } from '@/src/lib/api'
+import Image from 'next/image'
 
 const navItems = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -63,10 +64,16 @@ export default function Sidebar({ isOpen = false, onClose = () => {} }: SidebarP
       {/* Brand area */}
       <div className="h-16 flex items-center justify-between px-6 border-b border-slate-800">
         <div className="flex items-center gap-2 text-white font-bold tracking-tight">
-          <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
-            <ShieldCheck size={18} className="text-white" />
+          <div className="flex items-center justify-center shadow-lg shadow-blue-500/20">
+               <Image
+                                      src="/examloc_logo copy.png" 
+                                      alt="ExamLoc Logo" 
+                                      width={120} 
+                                      height={32} 
+                                      className="h-8 w-auto object-contain"
+                                    />
           </div>
-          <span>ExamGuard</span>
+          <span className='text-2xl'>ExamLoc</span>
         </div>
         
         <button 

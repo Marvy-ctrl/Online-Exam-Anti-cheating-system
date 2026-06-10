@@ -1,4 +1,4 @@
-# ExamGuard — Production Readiness Assessment
+# ExamLoc — Production Readiness Assessment
 
 > **Verdict: ~35% production-ready.** The system is demo-capable end-to-end, but has five
 > critical security/architecture violations that make it unsafe to run against real students.
@@ -8,29 +8,29 @@
 
 ## What Works Right Now (End-to-End)
 
-| Feature | Status | Notes |
-|---|---|---|
-| Examiner registration + email verification | ✅ Working | bcrypt passwords, itsdangerous tokens |
-| Login / logout / refresh token | ✅ Working | httpOnly cookie-based, 15min access / 2-day refresh |
-| Change password / forgot+reset password | ✅ Working | |
-| Institution management | ✅ Working | Cloudinary for logos |
-| Subject + exam CRUD | ✅ Working | |
-| Question + options CRUD | ✅ Working | |
-| Student pre-enrolment (examiner creates records) | ✅ Working | |
-| Student enrolment link validation (time window) | ✅ Working | |
-| Student face registration | ✅ Working | Single frame, stores embedding |
-| Exam entry (face gate, timing check) | ✅ Working | |
-| Live exam shell (questions, navigation) | ✅ Working | |
-| Answer save with 3-retry logic | ✅ Working | |
-| Tab-switch + focus-loss violation logging | ✅ Working | |
-| Periodic face verification (every 20s) | ✅ Working | |
-| WebSocket student ↔ examiner monitor relay | ✅ Working | Basic |
-| Exam submission + MCQ autograding | ✅ Working | Exact match, marks-weighted |
-| Manual score override by admin | ✅ Working | |
-| Session detail + results view | ✅ Working | |
-| Result email dispatch | ✅ Working | Via BackgroundTasks |
-| Analytics router | ✅ Exists | |
-| 9 Alembic migrations | ✅ Applied | |
+| Feature                                          | Status     | Notes                                               |
+| ------------------------------------------------ | ---------- | --------------------------------------------------- |
+| Examiner registration + email verification       | ✅ Working | bcrypt passwords, itsdangerous tokens               |
+| Login / logout / refresh token                   | ✅ Working | httpOnly cookie-based, 15min access / 2-day refresh |
+| Change password / forgot+reset password          | ✅ Working |                                                     |
+| Institution management                           | ✅ Working | Cloudinary for logos                                |
+| Subject + exam CRUD                              | ✅ Working |                                                     |
+| Question + options CRUD                          | ✅ Working |                                                     |
+| Student pre-enrolment (examiner creates records) | ✅ Working |                                                     |
+| Student enrolment link validation (time window)  | ✅ Working |                                                     |
+| Student face registration                        | ✅ Working | Single frame, stores embedding                      |
+| Exam entry (face gate, timing check)             | ✅ Working |                                                     |
+| Live exam shell (questions, navigation)          | ✅ Working |                                                     |
+| Answer save with 3-retry logic                   | ✅ Working |                                                     |
+| Tab-switch + focus-loss violation logging        | ✅ Working |                                                     |
+| Periodic face verification (every 20s)           | ✅ Working |                                                     |
+| WebSocket student ↔ examiner monitor relay       | ✅ Working | Basic                                               |
+| Exam submission + MCQ autograding                | ✅ Working | Exact match, marks-weighted                         |
+| Manual score override by admin                   | ✅ Working |                                                     |
+| Session detail + results view                    | ✅ Working |                                                     |
+| Result email dispatch                            | ✅ Working | Via BackgroundTasks                                 |
+| Analytics router                                 | ✅ Exists  |                                                     |
+| 9 Alembic migrations                             | ✅ Applied |                                                     |
 
 ---
 
@@ -128,18 +128,18 @@ Cosine distance queries (`<=>`) for deduplication checking require `vector(128)`
 
 ## Medium Issues (Before Scale / Second Institution)
 
-| Issue | Location | Impact |
-|---|---|---|
-| `print()` / `console.log()` throughout | All modules | No structured logs, no searchability, debug data in prod |
-| Duplicate route `/{exam_uid}/identify` registered twice | `exam_session/routes.py:179–203` | FastAPI silently uses the second; the first is dead code |
-| Exam shell page is 710 lines — single component | `exam/[exam_uid]/[enrollment_uid]/page.tsx` | Unmaintainable; one bug affects everything |
-| All API calls are inline `fetch()` in components | Exam shell page | No centralised error handling, no retry strategy |
-| Timer uses `sessionStorage`, lost on hard refresh | Exam shell page | Student loses timer on accidental refresh; no server-side timer endpoint |
-| No soft deletes on `Exam`, `Question`, `ExamEnrollment` | `db/models.py` | Hard deletes cascade and destroy audit trail |
-| Face check interval 20s (not 60s per spec) | Exam shell page | Sends 3× more frames than designed; higher CPU load on server |
-| No rate limiting on any endpoint | Entire API | `/verify-face` can be hammered from a script |
-| No CSP headers | Frontend | XSS not mitigated |
-| `api.ts` is almost entirely commented-out dead code | `frontend/src/lib/api.ts` | The apiFetch wrapper exists but exam shell ignores it entirely and calls `fetch()` directly |
+| Issue                                                   | Location                                    | Impact                                                                                      |
+| ------------------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `print()` / `console.log()` throughout                  | All modules                                 | No structured logs, no searchability, debug data in prod                                    |
+| Duplicate route `/{exam_uid}/identify` registered twice | `exam_session/routes.py:179–203`            | FastAPI silently uses the second; the first is dead code                                    |
+| Exam shell page is 710 lines — single component         | `exam/[exam_uid]/[enrollment_uid]/page.tsx` | Unmaintainable; one bug affects everything                                                  |
+| All API calls are inline `fetch()` in components        | Exam shell page                             | No centralised error handling, no retry strategy                                            |
+| Timer uses `sessionStorage`, lost on hard refresh       | Exam shell page                             | Student loses timer on accidental refresh; no server-side timer endpoint                    |
+| No soft deletes on `Exam`, `Question`, `ExamEnrollment` | `db/models.py`                              | Hard deletes cascade and destroy audit trail                                                |
+| Face check interval 20s (not 60s per spec)              | Exam shell page                             | Sends 3× more frames than designed; higher CPU load on server                               |
+| No rate limiting on any endpoint                        | Entire API                                  | `/verify-face` can be hammered from a script                                                |
+| No CSP headers                                          | Frontend                                    | XSS not mitigated                                                                           |
+| `api.ts` is almost entirely commented-out dead code     | `frontend/src/lib/api.ts`                   | The apiFetch wrapper exists but exam shell ignores it entirely and calls `fetch()` directly |
 
 ---
 

@@ -19,8 +19,15 @@ class InstitutionResponseModel(BaseModel):
     
     model_config = ConfigDict(from_attributes=True)
 
+class ActivityItemModel(BaseModel):
+    type: str
+    title: str
+    description: str
+    timestamp: str
+
 class OverviewResponseModel(BaseModel):
     institutions_count: int
     active_exams_count: int
     total_students_count: int
     violations_detected_count: int
+    recent_activities: list[ActivityItemModel]

@@ -1,0 +1,112 @@
+```
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sps-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-sps_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-sps_password}
+      POSTGRES_DB: ${DB_NAME:-smart_parking}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-sps_user} -d ${DB_NAME:-smart_parking}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: sps-redis
+    restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD:-sps_redis_password}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-sps_redis_password}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: sps-mosquitto
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_logs:/mosquitto/log
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_pub -h localhost -p 1883 -t health -m ping || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  core-api:
+    build:
+      context: ./backend/core-api
+      dockerfile: Dockerfile
+      target: production
+    container_name: sps-core-api
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      # Database — use Docker service name, not localhost
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-sps_user}
+      DB_PASSWORD: ${DB_PASSWORD:-sps_password}
+      DB_NAME: ${DB_NAME:-smart_parking}
+      DB_SYNC: ${DB_SYNC:-false}
+      # Redis — use Docker service name
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-sps_redis_password}
+      # JWT
+      JWT_SECRET: ${JWT_SECRET:-insecure_dev_secret_change_in_production}
+      JWT_ACCESS_EXPIRY: ${JWT_ACCESS_EXPIRY:-15m}
+      JWT_REFRESH_EXPIRY: ${JWT_REFRESH_EXPIRY:-30d}
+      # MQTT — use Docker service name
+      MQTT_HOST: mosquitto
+      MQTT_PORT: 1883
+      MQTT_USERNAME: ${MQTT_USERNAME:-}
+      MQTT_PASSWORD: ${MQTT_PASSWORD:-}
+      # Vision service
+      VISION_SERVICE_URL: ${VISION_SERVICE_URL:-http://localhost:8000}
+      VISION_CONFIDENCE_THRESHOLD: ${VISION_CONFIDENCE_THRESHOLD:-0.75}
+      # CORS origins
+      WEB_APP_URL: ${WEB_APP_URL:-http://localhost:3001}
+      MOBILE_APP_URL: ${MOBILE_APP_URL:-http://localhost:19006}
+      ADMIN_DASHBOARD_URL: ${ADMIN_DASHBOARD_URL:-http://localhost:3002}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mosquitto:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3001/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  postgres_data:
+  redis_data:
+  mosquitto_data:
+  mosquitto_logs:
+
+```

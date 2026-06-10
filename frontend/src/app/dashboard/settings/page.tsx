@@ -64,7 +64,7 @@ export default function SettingsPage() {
 
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden ">
         <div className="border-b border-slate-200 bg-slate-50 px-6 py-4 flex items-center gap-3">
-          <KeyRound className="text-slate-400" size={20} />
+          {/* <KeyRound className="text-slate-400" size={20} /> */}
           <h2 className="font-semibold text-slate-700">Change Password</h2>
         </div>
         

@@ -1,7 +1,8 @@
 "use client"
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Menu, X, Shield } from 'lucide-react'
+import { Menu, X } from 'lucide-react'
+import Image from 'next/image'
 
 export default function Header() {
   const [isOpen, setIsOpen] = useState(false)
@@ -23,13 +24,15 @@ export default function Header() {
         <div className="flex justify-between items-center">
 
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2.5 group">
-            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
-              <Shield size={16} className="text-white" />
-            </div>
-            <span className="text-slate-900 font-semibold text-lg tracking-tight">
-              Exam<span className="text-blue-600">Guard</span>
-            </span>
+          <Link href="/" className="flex items-center group">
+            <Image 
+              src="/examloc_logo.png" 
+              alt="ExamLoc Logo" 
+              width={120} 
+              height={32} 
+              className="h-8 w-auto object-contain"
+              priority
+            />
           </Link>
 
           {/* Desktop nav */}

@@ -11,7 +11,7 @@ const steps = [
       'Set duration independently (e.g. 45 mins)',
       'Pre-enroll students',
     ],
-    image: '/hiw-create.png',
+    image: '/examiner.jpg',
     imageAlt: 'Examiner creating an exam on a laptop',
     imageSide: 'right' as const,
     bg: 'bg-white',
@@ -30,7 +30,7 @@ const steps = [
       'Face captured at enrollment',
       'Same face verified again before exam starts',
     ],
-    image: '/hiw-verify.png',
+    image: '/student.avif',
     imageAlt: 'Student completing face verification',
     imageSide: 'left' as const,
     bg: 'bg-slate-950',
@@ -43,13 +43,13 @@ const steps = [
   {
     step: '03',
     title: 'You monitor. The system enforces.',
-    desc: 'During the exam, AI runs on the student\'s device tracking face presence, gaze direction, and multiple people. You see all of it live. Set rules for auto-submission when violations exceed your threshold.',
+    desc: 'During the exam, ExamLoc monitors the student\'s session through webcam verification and browser activity tracking. Examiners can view violations in real time, including face absence, multiple face detection, tab switching, and focus loss.',
     bullets: [
       'Live violation feed per student',
       'Auto-submit rules configured',
       'Auto-grade with examiner override',
     ],
-    image: '/hiw-monitor.png',
+    image: '/monitor.png',
     imageAlt: 'Live exam monitoring dashboard',
     imageSide: 'right' as const,
     bg: 'bg-white',
@@ -92,7 +92,7 @@ export default function HowItWorks() {
 
               {/* Image side */}
               <div className="flex-1 w-full">
-                <div className="rounded-2xl overflow-hidden border border-black/10">
+                <div className="rounded-2xl overflow-hidden">
                   <Image
                     src={image}
                     alt={imageAlt}

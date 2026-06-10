@@ -3,10 +3,10 @@ import Link from 'next/link'
 import { ArrowRight, Fingerprint, Eye, Brain, ShieldCheck } from 'lucide-react'
 
 const features = [
-  { icon: Fingerprint, label: 'Biometric Identity' },
-  { icon: Eye,         label: 'Live Gaze Tracking' },
-  { icon: Brain,       label: 'Edge AI Processing' },
-  { icon: ShieldCheck, label: 'Zero Trust Sessions' },
+  { icon: Fingerprint, label: 'Identity Verification' },
+  { icon: Eye,         label: 'Browser Activity Monitoring' },
+  { icon: Brain,       label: 'Violation Detection' },
+  { icon: ShieldCheck, label: 'Secure Exam Sessions' },
 ]
 
 export default function Hero() {
@@ -30,20 +30,17 @@ export default function Hero() {
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-500 opacity-75" />
             <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-blue-600" />
           </span>
-          Live Proctoring Active
-        </div>
+          REAL-TIME EXAM MONITORING        </div>
 
         {/* Headline */}
-        <h1 className="text-5xl sm:text-6xl font-bold text-slate-900 leading-none tracking-tight mb-5 max-w-3xl">
-          Exams that{' '}
-          <span className="text-blue-600">can't</span>
-          {' '}be cheated.
+        <h1 className="text-5xl sm:text-6xl font-bold text-slate-900 leading-none tracking-tight mb-5 max-w-4xl">
+          Secure online examinations.
         </h1>
 
         {/* Subheading */}
         <p className="text-slate-500 text-lg font-medium max-w-xl mb-10 leading-snug">
-          A zero-trust examination platform with biometric identity verification,
-          live AI monitoring, and real-time examiner oversight.
+          A secure online examination platform with identity verification,
+          real-time monitoring, browser activity tracking, and examiner oversight.
         </p>
 
         {/* CTAs — students receive links via email, no Enter Exam here */}
@@ -53,7 +50,7 @@ export default function Hero() {
             id="hero-cta-signup"
             className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-xl font-semibold text-sm transition-colors duration-200 group"
           >
-            Start as Examiner
+            Get Started
             <ArrowRight size={16} className="group-hover:translate-x-0.5 transition-transform duration-200" />
           </Link>
           <Link

@@ -3,6 +3,7 @@ import React, { Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { ShieldCheck, CheckCircle2, XCircle, Loader2 } from 'lucide-react'
 import Link from 'next/link'
+import Image from 'next/image'
 
 function VerifyEmailContent() {
   const searchParams = useSearchParams()
@@ -47,8 +48,14 @@ function VerifyEmailContent() {
   return (
     <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl p-10 text-center">
       <div className="flex justify-center mb-6">
-        <div className="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center">
-          <ShieldCheck size={24} className="text-white" />
+        <div className=" flex items-center justify-center">
+            <Image 
+                          src="/examloc_logo.png" 
+                          alt="ExamLoc Logo" 
+                          width={120} 
+                          height={32} 
+                          className="h-8 w-auto object-contain"
+                        />
         </div>
       </div>
 

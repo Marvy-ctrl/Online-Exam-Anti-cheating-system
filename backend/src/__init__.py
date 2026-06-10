@@ -37,7 +37,20 @@ async def life_span(app: FastAPI):
 
 
 version = "v1"
-app = FastAPI(lifespan=life_span, version=version)
+app = FastAPI(
+    title="ExamLoc Anti-Cheating API",
+    description="A high-integrity REST API for managing online exams with AI-powered proctoring and real-time behavioral monitoring.",
+    version=version,
+    lifespan=life_span,
+    docs_url=f"/api/{version}/docs",
+    redoc_url=f"/api/{version}/redoc",
+    contact={
+        "name": "Popoola Marvellous Ibukunoluwa",
+        "url": "https://github.com/Marvy-ctrl",
+        "email": "popoolamarvellous51@gmail.com",
+    },
+    openapi_url=f"/api/{version}/openapi.json",
+)
 
 import os
 BACKEND_DIR = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))

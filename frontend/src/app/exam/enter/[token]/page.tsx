@@ -2,6 +2,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Camera, AlertCircle, Loader2, Clock, ShieldCheck, CheckCircle, ArrowRight, RefreshCw } from 'lucide-react'
+import Image from 'next/image'
 
 const BASE_URL = `${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"}/api/v1`
 
@@ -278,8 +279,15 @@ export default function ExamEntryGatePage() {
       <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
         <div className="w-full max-w-md bg-white rounded-2xl border border-slate-200 shadow-sm p-8">
           <div className="text-center mb-8">
-            <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-4">
-              <ShieldCheck size={32} className="text-blue-600" />
+            <div className="flex justify-center mb-6">
+              <Image 
+                src="/examloc_logo copy.png" 
+                alt="ExamLoc Logo" 
+                width={150} 
+                height={40} 
+                className="h-10 w-auto object-contain"
+                priority
+              />
             </div>
             <h1 className="text-2xl font-bold text-slate-900 mb-2">Identify Yourself</h1>
             <p className="text-slate-500">To start <strong>{examInfo.exam_title}</strong>, please enter your registered email or student ID.</p>
@@ -467,8 +475,15 @@ export default function ExamEntryGatePage() {
       <div className="w-full max-w-lg">
         {/* Header */}
         <div className="text-center mb-6">
-          <div className="w-14 h-14 rounded-xl bg-blue-600 flex items-center justify-center mx-auto mb-4 shadow-sm shadow-blue-600/30">
-            <ShieldCheck size={28} className="text-white" />
+          <div className="flex justify-center mb-6">
+            <Image 
+              src="/examloc_logo copy.png" 
+              alt="ExamLoc Logo" 
+              width={150} 
+              height={40} 
+              className="h-10 w-auto object-contain brightness-0 invert"
+              priority
+            />
           </div>
           <h1 className="text-2xl font-bold text-white mb-1">Identity Verification</h1>
           <p className="text-slate-400 text-sm">

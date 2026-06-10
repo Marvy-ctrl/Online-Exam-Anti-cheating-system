@@ -16,8 +16,7 @@ export default function CTA() {
         </h2>
 
         <p className="text-slate-400 text-base max-w-xl mx-auto mb-10 leading-snug">
-          Sign up as an examiner, create your first exam in minutes, and let ExamGuard handle
-          identity verification and live monitoring from end to end.
+          Create and manage secure online examinations with identity verification, real-time monitoring, and comprehensive exam oversight.
         </p>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">

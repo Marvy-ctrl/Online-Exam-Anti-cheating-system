@@ -1,0 +1,237 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: examloc-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-examloc}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_DB: ${POSTGRES_DB:-examloc_db}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-examloc} -d ${POSTGRES_DB:-examloc_db}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  redis:
+    image: redis:7-alpine
+    container_name: examloc-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: examloc-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: ./backend
+    image: examloc-api
+    container_name: examloc-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      # Database
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://examloc:changeme@postgres:5432/examloc_db}
+      DB_SSL: ${DB_SSL:-false}
+      # Redis / Celery
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
+      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/0}
+      # JWT
+      JWT_SECRET_EXAMINER: ${JWT_SECRET_EXAMINER:-insecure_examiner_secret}
+      JWT_SECRET_STUDENT: ${JWT_SECRET_STUDENT:-insecure_student_secret}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      # App URLs
+      DOMAIN: ${DOMAIN:-http://localhost:8000}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      # MinIO
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_BUCKET: ${MINIO_BUCKET:-snapshots}
+      MINIO_SECURE: ${MINIO_SECURE:-false}
+      # SMTP
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-465}
+      SMTP_USER: ${SMTP_USER:-you@gmail.com}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-password}
+      SMTP_FROM: ${SMTP_FROM:-you@gmail.com}
+      # Cloudinary
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-cloud_name}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-api_key}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-api_secret}
+      # Face verification
+      FACE_SIMILARITY_THRESHOLD: ${FACE_SIMILARITY_THRESHOLD:-0.40}
+      FACE_ENROLLMENT_MIN_PASSING: ${FACE_ENROLLMENT_MIN_PASSING:-3}
+      # Encryption
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000}
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    command: uvicorn src:app --host 0.0.0.0 --port 8000
+
+  worker-face:
+    build: ./backend
+    image: examloc-api
+    container_name: examloc-faceworker
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://examloc:changeme@postgres:5432/examloc_db}
+      DB_SSL: ${DB_SSL:-false}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
+      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/0}
+      JWT_SECRET_EXAMINER: ${JWT_SECRET_EXAMINER:-insecure_examiner_secret}
+      JWT_SECRET_STUDENT: ${JWT_SECRET_STUDENT:-insecure_student_secret}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      DOMAIN: ${DOMAIN:-http://localhost:8000}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_BUCKET: ${MINIO_BUCKET:-snapshots}
+      MINIO_SECURE: ${MINIO_SECURE:-false}
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-465}
+      SMTP_USER: ${SMTP_USER:-you@gmail.com}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-password}
+      SMTP_FROM: ${SMTP_FROM:-you@gmail.com}
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-cloud_name}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-api_key}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-api_secret}
+      FACE_SIMILARITY_THRESHOLD: ${FACE_SIMILARITY_THRESHOLD:-0.40}
+      FACE_ENROLLMENT_MIN_PASSING: ${FACE_ENROLLMENT_MIN_PASSING:-3}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000}
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A src.worker.celery_app worker --loglevel=info --queues=face --pool=solo --concurrency=1
+
+  worker-grading:
+    build: ./backend
+    image: examloc-api
+    container_name: examloc-gradingworker
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://examloc:changeme@postgres:5432/examloc_db}
+      DB_SSL: ${DB_SSL:-false}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
+      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/0}
+      JWT_SECRET_EXAMINER: ${JWT_SECRET_EXAMINER:-insecure_examiner_secret}
+      JWT_SECRET_STUDENT: ${JWT_SECRET_STUDENT:-insecure_student_secret}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      DOMAIN: ${DOMAIN:-http://localhost:8000}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_BUCKET: ${MINIO_BUCKET:-snapshots}
+      MINIO_SECURE: ${MINIO_SECURE:-false}
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-465}
+      SMTP_USER: ${SMTP_USER:-you@gmail.com}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-password}
+      SMTP_FROM: ${SMTP_FROM:-you@gmail.com}
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-cloud_name}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-api_key}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-api_secret}
+      FACE_SIMILARITY_THRESHOLD: ${FACE_SIMILARITY_THRESHOLD:-0.40}
+      FACE_ENROLLMENT_MIN_PASSING: ${FACE_ENROLLMENT_MIN_PASSING:-3}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000}
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A src.worker.celery_app worker --loglevel=info --queues=grading --pool=solo --concurrency=1
+
+  worker-email:
+    build: ./backend
+    image: examloc-api
+    container_name: examloc-emailworker
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://examloc:changeme@postgres:5432/examloc_db}
+      DB_SSL: ${DB_SSL:-false}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
+      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/0}
+      JWT_SECRET_EXAMINER: ${JWT_SECRET_EXAMINER:-insecure_examiner_secret}
+      JWT_SECRET_STUDENT: ${JWT_SECRET_STUDENT:-insecure_student_secret}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      DOMAIN: ${DOMAIN:-http://localhost:8000}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_BUCKET: ${MINIO_BUCKET:-snapshots}
+      MINIO_SECURE: ${MINIO_SECURE:-false}
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-465}
+      SMTP_USER: ${SMTP_USER:-you@gmail.com}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-password}
+      SMTP_FROM: ${SMTP_FROM:-you@gmail.com}
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-cloud_name}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-api_key}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-api_secret}
+      FACE_SIMILARITY_THRESHOLD: ${FACE_SIMILARITY_THRESHOLD:-0.40}
+      FACE_ENROLLMENT_MIN_PASSING: ${FACE_ENROLLMENT_MIN_PASSING:-3}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A src.worker.celery_app worker --loglevel=info --queues=default --pool=solo --concurrency=2
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  uploads:

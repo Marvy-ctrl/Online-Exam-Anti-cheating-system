@@ -15,7 +15,7 @@ from celery import Celery
 from src.config import Config
 
 celery_app = Celery(
-    "examguard",
+    "examloc",
     broker=Config.REDIS_URL,
     backend=Config.REDIS_URL,
     include=[

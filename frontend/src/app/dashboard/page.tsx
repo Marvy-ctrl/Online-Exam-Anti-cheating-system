@@ -1,13 +1,41 @@
 "use client"
 import React, { useEffect, useState } from 'react'
-import { Activity, ShieldAlert, GraduationCap, Building2 } from 'lucide-react'
+import { Activity, ShieldAlert, GraduationCap, Building2, CheckCircle2, PlayCircle } from 'lucide-react'
 import { apiFetch } from '@/src/lib/api'
+
+interface ActivityItem {
+  type: string;
+  title: string;
+  description: string;
+  timestamp: string;
+}
 
 interface DashboardOverview {
   institutions_count: number;
   active_exams_count: number;
   total_students_count: number;
   violations_detected_count: number;
+  recent_activities: ActivityItem[];
+}
+
+function formatRelativeTime(dateString: string) {
+  try {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  } catch (e) {
+    return '';
+  }
 }
 
 export default function Dashboard() {
@@ -96,9 +124,54 @@ export default function Dashboard() {
 
       {/* Recent Activity */}
       <h2 className="text-xl font-bold text-slate-900 mb-6">Recent Activity</h2>
-      <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center">
-        <p className="text-slate-500">No recent activity found. Start by creating an institution!</p>
-      </div>
+      
+      {loading ? (
+        <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center shadow-sm">
+          <p className="text-slate-500 animate-pulse">Loading recent activity...</p>
+        </div>
+      ) : !overview?.recent_activities || overview.recent_activities.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center shadow-sm">
+          <p className="text-slate-500">No recent activity found. Start by creating an institution!</p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100 overflow-hidden shadow-sm">
+          {overview.recent_activities.map((activity, idx) => {
+            let Icon = Activity;
+            let iconBg = "bg-slate-50 text-slate-600";
+            
+            if (activity.type === 'violation') {
+              Icon = ShieldAlert;
+              iconBg = "bg-red-50 text-red-600";
+            } else if (activity.type === 'submission') {
+              Icon = CheckCircle2;
+              iconBg = "bg-green-50 text-green-600";
+            } else if (activity.type === 'session_start') {
+              Icon = PlayCircle;
+              iconBg = "bg-blue-50 text-blue-600";
+            } else if (activity.type === 'institution') {
+              Icon = Building2;
+              iconBg = "bg-purple-50 text-purple-600";
+            }
+
+            return (
+              <div key={idx} className="flex items-center justify-between p-5 hover:bg-slate-50/50 transition-colors">
+                <div className="flex items-center gap-4">
+                  <div className={`p-2.5 rounded-xl ${iconBg}`}>
+                    <Icon size={20} />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-slate-900 text-sm leading-snug">{activity.title}</h4>
+                    <p className="text-slate-500 text-xs mt-0.5">{activity.description}</p>
+                  </div>
+                </div>
+                <span className="text-slate-400 text-xs font-medium whitespace-nowrap">
+                  {formatRelativeTime(activity.timestamp)}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   )
 }

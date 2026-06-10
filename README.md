@@ -1,21 +1,24 @@
-# ExamGuard: High-Integrity Online Examination System
+# ExamLoc: High-Integrity Online Examination System
 
-ExamGuard is a professional-grade, high-integrity examination platform designed to prevent cheating through real-time biometric monitoring and strict browser-level enforcement.
+ExamLoc is a professional-grade, high-integrity examination platform designed to prevent cheating through real-time biometric monitoring and strict browser-level enforcement.
 
 ## 🚀 Key Features
 
 ### 🛡️ Anti-Cheating & Proctoring
+
 - **Biometric Identity Verification**: Match live webcam feeds against enrolled face embeddings using 128-bit vector comparisons.
 - **Continuous Monitoring**: Detects "No Face", "Multiple Faces", and "Face Mismatch" in real-time.
 - **Browser Enforcement**: Tracks tab switching, window focus loss, and blocks unauthorized actions (right-click, copy/paste).
 - **Automated Enforcement**: Configurable violation thresholds for automatic exam flagging or termination.
 
 ### 📊 Examiner Control
+
 - **Live Monitoring Dashboard**: Real-time WebSocket feed of student status and violations.
 - **Exam Randomization**: Deterministic shuffling of both questions and options.
 - **Forensic Audit Logs**: Detailed timeline of events and snapshots for post-exam review.
 
 ### 🏗️ Technical Architecture
+
 - **Backend**: FastAPI (Python) for high-performance async processing and biometrics.
 - **Frontend**: Next.js (React) for a secure, responsive exam shell.
 - **Database**: PostgreSQL with SQLModel for type-safe data integrity.
@@ -26,11 +29,13 @@ ExamGuard is a professional-grade, high-integrity examination platform designed 
 ## 🛠️ Setup Instructions
 
 ### Prerequisites
+
 - **Python 3.10+**
 - **Node.js 18+**
 - **PostgreSQL**
 
 ### 1. Backend Setup
+
 ```bash
 # Navigate to the project root
 cd Online-Exam-Anti-cheating-system
@@ -51,6 +56,7 @@ fastapi dev backend/src --host 0.0.0.0
 ```
 
 ### 2. Frontend Setup
+
 ```bash
 # Navigate to the frontend directory
 cd frontend
@@ -88,9 +94,11 @@ npm run dev
 ---
 
 ## ⚖️ Engineering Mindset
+
 Every component in this system is built with a **Zero Trust** model. We never trust client-side data. All timing, violation counts, and identity checks are authoritatively validated on the backend.
 
 ---
 
 ## 📝 License
+
 Proprietary / Research Project.

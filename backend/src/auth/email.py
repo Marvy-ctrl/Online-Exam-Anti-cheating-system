@@ -17,10 +17,17 @@ def send_email(to_email: str, subject: str, html_content: str) -> None:
     msg.attach(MIMEText(html_content, "html"))
 
     try:
-        # Use SMTP_SSL on Port 465 to bypass normal ISP port blocks
-        with smtplib.SMTP_SSL(Config.SMTP_HOST, 465, timeout=15) as server:
-            server.login(Config.SMTP_USER, Config.SMTP_PASSWORD)
-            server.sendmail(Config.SMTP_FROM, to_email, msg.as_string())
+        port = int(Config.SMTP_PORT)
+        if port == 465:
+            with smtplib.SMTP_SSL(Config.SMTP_HOST, port, timeout=15) as server:
+                server.login(Config.SMTP_USER, Config.SMTP_PASSWORD)
+                server.sendmail(Config.SMTP_FROM, to_email, msg.as_string())
+        else:
+            with smtplib.SMTP(Config.SMTP_HOST, port, timeout=15) as server:
+                server.ehlo()
+                server.starttls()
+                server.login(Config.SMTP_USER, Config.SMTP_PASSWORD)
+                server.sendmail(Config.SMTP_FROM, to_email, msg.as_string())
     except Exception as e:
         print(f"\n[NETWORK BLOCK] Failed to send email to {to_email}. Error: {e}")
         print("Falling back to local console verification...")
@@ -56,7 +63,7 @@ def send_verification_email(to_email: str, token: str) -> None:
     </html>
     """
     try:
-        send_email(to_email, "Verify your ExamGuard Account", html)
+        send_email(to_email, "Verify your ExamLoc Account", html)
     except ValueError:
         print("\n\n" + "="*50)
         print("🚨 MANUALLY VERIFY YOUR ACCOUNT TO CONTINUE 🚨")
@@ -122,7 +129,7 @@ def send_password_reset_email(to_email: str, token: str) -> None:
     </html>
     """
     try:
-        send_email(to_email, "Reset your ExamGuard Password", html)
+        send_email(to_email, "Reset your ExamLoc Password", html)
     except ValueError:
         print("\n\n" + "="*50)
         print("🚨 MANUALLY RESET YOUR PASSWORD TO CONTINUE 🚨")

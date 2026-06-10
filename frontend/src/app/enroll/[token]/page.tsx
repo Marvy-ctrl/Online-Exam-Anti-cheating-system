@@ -2,8 +2,8 @@
 import React, { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import { ShieldCheck, AlertCircle, CheckCircle, Loader2, Clock } from 'lucide-react'
-
 import Link from 'next/link'
+import Image from 'next/image'
 
 const BASE_URL =
   `${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"}/api/v1`;
@@ -205,8 +205,15 @@ export default function StudentEnrollPage() {
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="w-14 h-14 rounded-xl bg-blue-600 flex items-center justify-center mx-auto mb-4 shadow-sm shadow-blue-600/20">
-            <ShieldCheck size={28} className="text-white" />
+          <div className="flex justify-center mb-6">
+            <Image 
+              src="/examloc_logo copy.png" 
+              alt="ExamLoc Logo" 
+              width={150} 
+              height={40} 
+              className="h-10 w-auto object-contain"
+              priority
+            />
           </div>
           <h1 className="text-2xl font-bold text-slate-900">Exam Enrollment</h1>
           <p className="text-slate-500 mt-2 text-sm">
