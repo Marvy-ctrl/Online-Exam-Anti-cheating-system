@@ -5,6 +5,7 @@ import { ChevronRight, ChevronLeft, Users, FileText, Cog, ShieldCheck, Mail, Cal
 import Link from 'next/link'
 import { apiFetch } from '@/src/lib/api'
 import QuestionManager from '@/src/components/dashboard/QuestionManager'
+import { DateTimePicker } from '@/components/ui/datetime-picker'
 
 interface Exam {
   uid: string
@@ -82,16 +83,16 @@ export default function ExamDetailWorkspace() {
   const [sendExamLinkSuccess, setSendExamLinkSuccess] = useState(false)
 
   // Manual Expiry State
-  const [linkStartTime, setLinkStartTime] = useState("")
-  const [linkEndTime, setLinkEndTime] = useState("")
+  const [linkStartTime, setLinkStartTime] = useState<Date | undefined>(undefined)
+  const [linkEndTime, setLinkEndTime] = useState<Date | undefined>(undefined)
   const [isEditingLink, setIsEditingLink] = useState(false)
 
   // Edit Exam State
   const [editTitle, setEditTitle] = useState("")
   const [editDuration, setEditDuration] = useState("")
   const [editDescription, setEditDescription] = useState("")
-  const [editStartTime, setEditStartTime] = useState("")
-  const [editEndTime, setEditEndTime] = useState("")
+  const [editStartTime, setEditStartTime] = useState<Date | undefined>(undefined)
+  const [editEndTime, setEditEndTime] = useState<Date | undefined>(undefined)
   const [editShuffleQuestions, setEditShuffleQuestions] = useState(false)
   const [editShuffleOptions, setEditShuffleOptions] = useState(false)
   const [isUpdatingExam, setIsUpdatingExam] = useState(false)
@@ -135,15 +136,15 @@ export default function ExamDetailWorkspace() {
       setExam(data)
       
       // Initialize manual link times
-      if (data.start_time) setLinkStartTime(new Date(data.start_time).toISOString().slice(0, 16))
-      if (data.end_time) setLinkEndTime(new Date(data.end_time).toISOString().slice(0, 16))
+      if (data.start_time) setLinkStartTime(new Date(data.start_time))
+      if (data.end_time) setLinkEndTime(new Date(data.end_time))
 
       // Initialize edit state
       if (data.title) setEditTitle(data.title)
       if (data.duration_minutes) setEditDuration(data.duration_minutes.toString())
       if (data.description) setEditDescription(data.description)
-      if (data.start_time) setEditStartTime(new Date(data.start_time).toISOString().slice(0, 16))
-      if (data.end_time) setEditEndTime(new Date(data.end_time).toISOString().slice(0, 16))
+      if (data.start_time) setEditStartTime(new Date(data.start_time))
+      if (data.end_time) setEditEndTime(new Date(data.end_time))
       setEditShuffleQuestions(data.shuffle_questions || false)
       setEditShuffleOptions(data.shuffle_options || false)
 
@@ -264,8 +265,8 @@ export default function ExamDetailWorkspace() {
       const res = await apiFetch(`/exam/${exam_uid}/enroll_link`, {
         method: 'POST',
         body: JSON.stringify({
-          link_start_time: linkStartTime,
-          link_end_time: linkEndTime
+          link_start_time: linkStartTime?.toISOString() || null,
+          link_end_time: linkEndTime?.toISOString() || null
         })
       })
       if (res.ok) {
@@ -316,8 +317,8 @@ export default function ExamDetailWorkspace() {
           title: editTitle,
           duration_minutes: parseInt(editDuration),
           description: editDescription,
-          start_time: new Date(editStartTime).toISOString(),
-          end_time: new Date(editEndTime).toISOString(),
+          start_time: editStartTime?.toISOString() || null,
+          end_time: editEndTime?.toISOString() || null,
           shuffle_questions: editShuffleQuestions,
           shuffle_options: editShuffleOptions,
         })
@@ -703,15 +704,15 @@ export default function ExamDetailWorkspace() {
 
             <div className="pt-6 border-t border-slate-100">
               <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
-                <Send size={20} className="text-blue-600" />
+                {/* <Send size={20} className="text-blue-600" /> */}
                 Enrollment & Invitations
               </h2>
 
               {!exam.enroll_link ? (
                 <div className=" border border-blue-100 rounded-2xl p-6 text-center">
-                  <AlertCircle className="text-blue-600 mx-auto mb-3" size={32} />
-                  <h3 className="font-bold text-blue-900 mb-1">No Enrollment Link Generated</h3>
-                  <p className="text-blue-700 text-sm mb-6 max-w-md mx-auto">
+                  {/* <AlertCircle className="text-blue-600 mx-auto mb-3" size={32} /> */}
+                  <h3 className="font-bold mb-1">No Enrollment Link Generated</h3>
+                  <p className=" text-sm mb-6 max-w-md mx-auto">
                     Students need a secure link to verify their identities and join this exam. 
                     Generate one now to start inviting your candidates.
                   </p>
@@ -731,21 +732,11 @@ export default function ExamDetailWorkspace() {
                          <div className="space-y-4 mb-8">
                             <div>
                               <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Enrollment Opens</label>
-                              <input 
-                                type="datetime-local" 
-                                value={linkStartTime}
-                                onChange={(e) => setLinkStartTime(e.target.value)}
-                                className="w-full bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
-                              />
+                              <DateTimePicker date={linkStartTime} setDate={setLinkStartTime} />
                             </div>
                             <div>
                               <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Enrollment Closes (Expiry)</label>
-                              <input 
-                                type="datetime-local" 
-                                value={linkEndTime}
-                                onChange={(e) => setLinkEndTime(e.target.value)}
-                                className="w-full bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
-                              />
+                              <DateTimePicker date={linkEndTime} setDate={setLinkEndTime} />
                             </div>
                          </div>
 
@@ -783,7 +774,7 @@ export default function ExamDetailWorkspace() {
                              Update Window
                            </button>
                            <div className="flex items-center gap-1.5 text-xs text-green-600 font-bold px-2 py-0.5 bg-green-50 border border-green-100 rounded-md">
-                             <CheckCircle size={12} /> Active
+                            Active
                            </div>
                         </div>
                       </div>
@@ -797,21 +788,11 @@ export default function ExamDetailWorkspace() {
                              <div className="space-y-4 mb-8">
                                 <div>
                                   <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Enrollment Opens</label>
-                                  <input 
-                                    type="datetime-local" 
-                                    value={linkStartTime}
-                                    onChange={(e) => setLinkStartTime(e.target.value)}
-                                    className="w-full bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
-                                  />
+                                  <DateTimePicker date={linkStartTime} setDate={setLinkStartTime} />
                                 </div>
                                 <div>
                                   <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Enrollment Closes (Expiry)</label>
-                                  <input 
-                                    type="datetime-local" 
-                                    value={linkEndTime}
-                                    onChange={(e) => setLinkEndTime(e.target.value)}
-                                    className="w-full bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
-                                  />
+                                  <DateTimePicker date={linkEndTime} setDate={setLinkEndTime} />
                                 </div>
                              </div>
 
@@ -836,7 +817,7 @@ export default function ExamDetailWorkspace() {
                       
                       <div className="mb-4">
                         <div className="flex items-center gap-2 text-[10px] text-slate-400 mb-1">
-                          <Calendar size={10} /> Enrollment Window
+                           Enrollment Window
                         </div>
                         <div className="text-[11px] font-medium text-slate-600">
                           {exam.link_start_time ? new Date(exam.link_start_time).toLocaleString() : 'N/A'} 
@@ -870,7 +851,6 @@ export default function ExamDetailWorkspace() {
                   {/* Invitation Tool */}
                   <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
                     <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
-                      <Mail size={18} className="text-blue-600" />
                       Send Email Invitations
                     </h3>
                     <div className="space-y-4">
@@ -904,7 +884,6 @@ export default function ExamDetailWorkspace() {
                           </>
                         ) : (
                           <>
-                            <Send size={18} />
                             Send to {students.filter(s => s.status !== 'enrolled').length} Pending Students
                           </>
                         )}
@@ -928,7 +907,7 @@ export default function ExamDetailWorkspace() {
             {/* Exam Link Section */}
             <div className="pt-6 border-t border-slate-100">
               <h2 className="text-lg font-bold text-slate-900 mb-1 flex items-center gap-2">
-                <ShieldCheck size={20} className="text-green-600" />
+                {/* <ShieldCheck size={20} className="text-green-600" /> */}
                 Exam Entry Link
               </h2>
               <p className="text-sm text-slate-500 mb-4">
@@ -982,7 +961,7 @@ export default function ExamDetailWorkspace() {
 
                   <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
                     <h3 className="font-bold text-slate-900 mb-1 flex items-center gap-2">
-                      <Mail size={18} className="text-green-600" />
+                      {/* <Mail size={18} className="text-green-600" /> */}
                       Send to Enrolled Students
                     </h3>
                     <p className="text-xs text-slate-500 mb-4">
@@ -1000,9 +979,9 @@ export default function ExamDetailWorkspace() {
                       {isSendingExamLink ? (
                         <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Sending...</>
                       ) : sendExamLinkSuccess ? (
-                        <><CheckCircle size={18} /> Exam Links Sent!</>
+                        <> Exam Links Sent!</>
                       ) : (
-                        <><Send size={18} /> Send Exam Link to Students</>
+                        <> Send Exam Link to Students</>
                       )}
                     </button>
                     {students.filter(s => s.status === 'enrolled').length === 0 && (
@@ -1295,23 +1274,11 @@ export default function ExamDetailWorkspace() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Start Time</label>
-                    <input
-                      type="datetime-local"
-                      required
-                      value={editStartTime}
-                      onChange={(e) => setEditStartTime(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
-                    />
+                    <DateTimePicker date={editStartTime} setDate={setEditStartTime} />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">End Time</label>
-                    <input
-                      type="datetime-local"
-                      required
-                      value={editEndTime}
-                      onChange={(e) => setEditEndTime(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
-                    />
+                    <DateTimePicker date={editEndTime} setDate={setEditEndTime} />
                   </div>
                 </div>
 

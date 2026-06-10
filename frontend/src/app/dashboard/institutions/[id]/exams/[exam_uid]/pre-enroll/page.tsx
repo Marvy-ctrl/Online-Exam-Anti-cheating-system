@@ -104,7 +104,7 @@ export default function BulkPreEnrollPage() {
                 Bulk Pre-Enroll Students
               </h1>
               <p className="text-slate-500 mt-2 flex items-center gap-2">
-                <ShieldCheck size={16} className="text-green-500" />
+                {/* <ShieldCheck size={16} className="text-green-500" /> */}
                 These students will be whitelisted for entry into the exam and students will be granted access to this exam.
               </p>
             </div>
@@ -224,7 +224,6 @@ export default function BulkPreEnrollPage() {
                 </>
               ) : (
                 <>
-                  <Save size={18} />
                   Save All Students
                 </>
               )}

@@ -175,9 +175,8 @@ export default function StudentEnrollPage() {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="w-full max-w-md bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center">
-          <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
-            <CheckCircle size={32} className="text-green-600" />
-          </div>
+          {/* <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
+          </div> */}
           <h1 className="text-2xl font-bold text-slate-900 mb-2">Details Verified!</h1>
           <p className="text-slate-500 mb-6">
             Your details have been verified successfully. 
@@ -207,7 +206,7 @@ export default function StudentEnrollPage() {
         <div className="text-center mb-8">
           <div className="flex justify-center mb-6">
             <Image 
-              src="/examloc_logo copy.png" 
+              src="/examloc_logo.png" 
               alt="ExamLoc Logo" 
               width={150} 
               height={40} 
@@ -238,7 +237,7 @@ export default function StudentEnrollPage() {
                 required
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
-                placeholder="Will"
+                placeholder=""
                 className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
               />
             </div>
@@ -249,7 +248,7 @@ export default function StudentEnrollPage() {
                 required
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
-                placeholder="Smith"
+                placeholder=""
                 className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
               />
             </div>
@@ -262,7 +261,7 @@ export default function StudentEnrollPage() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="willsmith@gmail.com"
+              placeholder=""
               className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
             />
           </div>
@@ -274,7 +273,7 @@ export default function StudentEnrollPage() {
               required
               value={studentId}
               onChange={(e) => setStudentId(e.target.value)}
-              placeholder="STU-2024-001"
+              placeholder="001"
               className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
             />
           </div>
@@ -291,7 +290,6 @@ export default function StudentEnrollPage() {
               </>
             ) : (
               <>
-                <ShieldCheck size={18} />
                 Verify & Enroll
               </>
             )}

@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react'
 import { apiFetch } from '@/src/lib/api'
 import { X, Calendar, Clock, AlertCircle } from 'lucide-react'
+import { DateTimePicker } from '@/components/ui/datetime-picker'
 
 interface Subject {
   uid: string
@@ -22,8 +23,8 @@ export default function CreateExamModal({ isOpen, onClose, institutionUid, subje
   const [description, setDescription] = useState('')
   const [subjectUid, setSubjectUid] = useState('')
   const [durationMinutes, setDurationMinutes] = useState(60)
-  const [startTime, setStartTime] = useState('')
-  const [endTime, setEndTime] = useState('')
+  const [startTime, setStartTime] = useState<Date | undefined>(undefined)
+  const [endTime, setEndTime] = useState<Date | undefined>(undefined)
   const [shuffleQuestions, setShuffleQuestions] = useState(false)
   const [shuffleOptions, setShuffleOptions] = useState(false)
   
@@ -38,9 +39,8 @@ export default function CreateExamModal({ isOpen, onClose, institutionUid, subje
     // Set a default start time (now) and end time (+24h)
     const now = new Date()
     const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000)
-    // format as YYYY-MM-DDThh:mm
-    setStartTime(now.toISOString().slice(0, 16))
-    setEndTime(tomorrow.toISOString().slice(0, 16))
+    setStartTime(now)
+    setEndTime(tomorrow)
     
     // Reset standard state
     setTitle('')
@@ -58,9 +58,15 @@ export default function CreateExamModal({ isOpen, onClose, institutionUid, subje
     setLoading(true)
     setError(null)
 
+    if (!startTime || !endTime) {
+      setError("Please select both start and end times")
+      setLoading(false)
+      return
+    }
+
     // Convert local datetime to UTC for the backend
-    const startUTC = new Date(startTime).toISOString()
-    const endUTC = new Date(endTime).toISOString()
+    const startUTC = startTime.toISOString()
+    const endUTC = endTime.toISOString()
 
     try {
       const res = await apiFetch("/exam/create_exam", {
@@ -183,28 +189,12 @@ export default function CreateExamModal({ isOpen, onClose, institutionUid, subje
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Valid From</label>
-              <div className="relative">
-                <input 
-                  type="datetime-local" 
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                  required
-                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                />
-              </div>
+              <DateTimePicker date={startTime} setDate={setStartTime} />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Valid Until</label>
-              <div className="relative">
-                <input 
-                  type="datetime-local" 
-                  value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                  required
-                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                />
-              </div>
+              <DateTimePicker date={endTime} setDate={setEndTime} />
             </div>
 
             <div className="col-span-1 md:col-span-2 flex flex-col gap-4">

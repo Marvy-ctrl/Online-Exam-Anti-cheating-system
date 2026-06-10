@@ -279,15 +279,16 @@ export default function ExamEntryGatePage() {
       <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
         <div className="w-full max-w-md bg-white rounded-2xl border border-slate-200 shadow-sm p-8">
           <div className="text-center mb-8">
-            <div className="flex justify-center mb-6">
+            <div className="flex items-center justify-center gap-2 mb-6 text-slate-900 font-bold tracking-tight">
               <Image 
                 src="/examloc_logo copy.png" 
                 alt="ExamLoc Logo" 
-                width={150} 
-                height={40} 
-                className="h-10 w-auto object-contain"
+                width={120} 
+                height={32} 
+                className="h-8 w-auto object-contain"
                 priority
               />
+              <span className="text-2xl">ExamLoc</span>
             </div>
             <h1 className="text-2xl font-bold text-slate-900 mb-2">Identify Yourself</h1>
             <p className="text-slate-500">To start <strong>{examInfo.exam_title}</strong>, please enter your registered email or student ID.</p>
@@ -462,7 +463,7 @@ export default function ExamEntryGatePage() {
             disabled={!checkedRules || !checkedConsent}
             className="w-full py-3.5 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
           >
-            Start Secure Exam Room
+            Start Exam 
           </button>
         </div>
       </div>
@@ -475,15 +476,16 @@ export default function ExamEntryGatePage() {
       <div className="w-full max-w-lg">
         {/* Header */}
         <div className="text-center mb-6">
-          <div className="flex justify-center mb-6">
+          <div className="flex items-center justify-center gap-2 mb-6 text-white font-bold tracking-tight">
             <Image 
               src="/examloc_logo copy.png" 
               alt="ExamLoc Logo" 
-              width={150} 
-              height={40} 
-              className="h-10 w-auto object-contain brightness-0 invert"
+              width={120} 
+              height={32} 
+              className="h-8 w-auto object-contain"
               priority
             />
+            <span className="text-2xl">ExamLoc</span>
           </div>
           <h1 className="text-2xl font-bold text-white mb-1">Identity Verification</h1>
           <p className="text-slate-400 text-sm">

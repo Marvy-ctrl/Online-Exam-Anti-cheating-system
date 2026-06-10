@@ -39,15 +39,12 @@ export default function FaceRegistrationPage() {
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-slate-50 to-blue-50">
         <div className="w-full max-w-md bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center">
-          <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
-            <CheckCircle size={32} className="text-green-600" />
-          </div>
+         
           <h1 className="text-2xl font-bold text-slate-900 mb-2">
-            Fully Enrolled!
+            Face Registration Complete
           </h1>
-          <p className="text-slate-500 mb-6">
-            Your face has been securely registered with 5-angle capture. Your
-            enrollment is now complete.
+          <p className="text-slate-500 text-sm mb-6">
+           Your facial profile has been successfully captured and securely stored. You are now ready to participate in examinations using ExamLoc identity verification system.
           </p>
           <p className="text-xs text-slate-400 mt-6">
             Wishing you good luck in your academics!

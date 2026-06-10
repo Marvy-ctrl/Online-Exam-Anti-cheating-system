@@ -288,12 +288,10 @@ export default function SessionAuditPage() {
                   </>
                 ) : emailSent ? (
                   <>
-                    <CheckCircle2 size={13} />
                     Result Sent
                   </>
                 ) : (
                   <>
-                    <Send size={13} />
                     Send Result to Student
                   </>
                 )}
@@ -329,27 +327,27 @@ export default function SessionAuditPage() {
           </div>
 
           {/* Stats row */}
-          <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-stretch gap-3 flex-wrap">
             {[
               {
                 label: 'Score',
                 value: auditDetails.score !== null ? `${auditDetails.score} / ${auditDetails.total_marks || 0}` : '--',
-                sub: '',
-                icon: <TrendingUp size={13} className="text-blue-500" />,
+                sub: 'Final result',
+                // icon: <TrendingUp size={13} className="text-blue-500" />,
                 accent: 'border-slate-200',
               },
               {
                 label: 'Violations',
                 value: `${auditDetails.violations.length}`,
                 sub: auditDetails.violations.length === 0 ? 'Clean session' : 'Events recorded',
-                icon: <AlertTriangle size={13} className={auditDetails.violations.length === 0 ? 'text-green-500' : 'text-red-500'} />,
+                // icon: <AlertTriangle size={13} className={auditDetails.violations.length === 0 ? 'text-green-500' : 'text-red-500'} />,
                 accent: auditDetails.violations.length === 0 ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50',
               },
               {
                 label: 'Duration',
                 value: duration,
                 sub: 'Session length',
-                icon: <Clock size={13} className="text-slate-400" />,
+                // icon: <Clock size={13} className="text-slate-400" />,
                 accent: 'border-slate-200',
               },
             ].map(s => (
@@ -593,20 +591,20 @@ export default function SessionAuditPage() {
                           </div>
                         )}
                       </div>
-                      <div className="mt-2">
-                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">
-                          First: {new Date(s.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </p>
-                        {s.occurrence_count && s.occurrence_count > 1 && s.last_seen_at && (
-                          <p className="text-[9px] text-slate-400 mt-0.5">
-                            Last: {new Date(s.last_seen_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </p>
-                        )}
-                        <div className="flex items-center gap-1 mt-0.5">
-                          <div className={`w-1.5 h-1.5 rounded-full ${s.face_matches && !s.multiple_faces ? 'bg-green-500' : 'bg-red-500'}`} />
-                          <span className="text-[10px] font-medium text-slate-600">
-                            {s.face_matches && !s.multiple_faces ? 'Verified' : 'Flagged'}
-                            {s.occurrence_count && s.occurrence_count > 1 ? ` (${s.occurrence_count}×)` : ''}
+                      <div className="mt-2.5">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <div className="flex items-center gap-1.5">
+                            <div className={`w-1.5 h-1.5 rounded-full ${s.violation_type ? 'bg-red-500' : 'bg-green-500'}`} />
+                            <span className={`text-[10px] font-bold ${s.violation_type ? 'text-red-600' : 'text-slate-600'}`}>
+                              {s.violation_type ? getConfig(s.violation_type).label : 'Clean Snapshot'}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[9px] text-slate-400 font-medium">
+                          <Clock size={10} className="text-slate-300" />
+                          <span>
+                            {new Date(s.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            {s.occurrence_count && s.occurrence_count > 1 && s.last_seen_at && ` - ${new Date(s.last_seen_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
                           </span>
                         </div>
                       </div>

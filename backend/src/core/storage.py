@@ -122,7 +122,7 @@ class StorageService:
             logger.error(f"Local storage fallback failed: {e}")
             # As a final absolute fallback, return a raw inline base64 placeholder so we never crash the session
             return {
-                "image_path": f"data:image/jpeg;base64,{image_data_str[:50]}...",
+                "image_path": f"data:image/jpeg;base64,{image_data_str}",
                 "object_key": None,
             }
 
@@ -140,6 +140,9 @@ class StorageService:
                 object_name=object_key,
                 expires=timedelta(minutes=15),
             )
+            # Allow browser to resolve localhost instead of the docker-internal 'minio' hostname
+            if "minio:9000" in url and "localhost" in Config.DOMAIN:
+                url = url.replace("minio:9000", "localhost:9000")
             return url
         except Exception as e:
             logger.warning(f"Failed to generate MinIO presigned URL: {e}")
