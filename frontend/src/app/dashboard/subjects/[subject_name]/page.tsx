@@ -144,7 +144,7 @@ export default function GlobalSubjectDetailPage() {
       {/* Header Context */}
       <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm mb-8">
         <div className="flex items-center gap-4 mb-6">
-          <div className="w-14 h-14 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
+          <div className="w-14 h-14 rounded-xl flex items-center justify-center text-blue-600">
             <BookOpen size={28} />
           </div>
           <div>

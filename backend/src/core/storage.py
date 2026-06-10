@@ -4,6 +4,9 @@ import base64
 import logging
 from datetime import timedelta
 from typing import Dict, Any, Optional
+from minio.error import S3Error
+from minio.lifecycleconfig import LifecycleConfig, Rule, Expiration
+from minio.commonconfig import Filter
 from src.config import Config
 from minio import Minio
 import io
@@ -40,6 +43,17 @@ class StorageService:
             if not self.minio_client.bucket_exists(self.bucket_name):
                 self.minio_client.make_bucket(self.bucket_name)
                 logger.info(f"Created MinIO bucket: {self.bucket_name}")
+            
+            # Unconditionally enforce 7-day data retention policy for privacy/storage management
+            config = LifecycleConfig([
+                Rule(
+                    status="Enabled",
+                    rule_filter=Filter(prefix=""),
+                    rule_id="expire-snapshots-7-days",
+                    expiration=Expiration(days=7)
+                )
+            ])
+            self.minio_client.set_bucket_lifecycle(self.bucket_name, config)
             return True
         except Exception as e:
             logger.warning(f"MinIO bucket check failed (MinIO might be offline): {e}")

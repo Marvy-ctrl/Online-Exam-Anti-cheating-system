@@ -4,12 +4,15 @@ import { apiFetch } from '@/src/lib/api'
 import { 
   Activity, 
   ShieldAlert, 
+  BookCheck,
+  Users,
   GraduationCap, 
   Building2, 
   BarChart3, 
   AlertTriangle,
   RefreshCcw,
-  Calendar
+  Calendar,
+  TriangleAlert
 } from 'lucide-react'
 import ViolationDistributionChart from '@/src/components/analytics/ViolationDistributionChart'
 import ActivityTrendChart from '@/src/components/analytics/ActivityTrendChart'
@@ -91,19 +94,19 @@ export default function AnalyticsPage() {
         <StatCard 
           title="Total Exams" 
           value={data?.overview.total_exams ?? 0} 
-          icon={<BarChart3 size={20} />} 
+          icon={<BookCheck size={20} />} 
           color="purple"
         />
         <StatCard 
           title="Total Students" 
           value={data?.overview.total_students ?? 0} 
-          icon={<GraduationCap size={20} />} 
+          icon={<Users size={20} />} 
           color="emerald"
         />
         <StatCard 
           title="Security Violations" 
           value={data?.overview.total_violations ?? 0} 
-          icon={<ShieldAlert size={20} />} 
+          icon={<TriangleAlert size={20} />} 
           color="red"
           isAlert
         />
@@ -114,7 +117,7 @@ export default function AnalyticsPage() {
         <div className="lg:col-span-2 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
           <div className="flex items-center justify-between mb-8">
             <h3 className="font-bold text-slate-900 text-lg flex items-center gap-2">
-              <Activity size={20} className="text-blue-600" />
+              {/* <Activity size={20} className="text-blue-600" /> */}
               Violation Trends
             </h3>
             <div className="flex items-center gap-2 text-xs font-medium text-slate-500 bg-slate-50 px-3 py-1 rounded-full">

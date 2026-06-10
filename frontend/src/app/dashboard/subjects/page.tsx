@@ -121,7 +121,7 @@ export default function GlobalSubjectsPage() {
               className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-300 transition-all group block relative"
             >
               <div className="flex items-start justify-between mb-4">
-                <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center overflow-hidden">
+                <div className=" flex items-center justify-center overflow-hidden">
                   <BookOpen size={24} className="text-blue-600" />
                 </div>
                 <div className="p-1.5 bg-slate-50 text-slate-400 rounded-lg group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
@@ -132,7 +132,7 @@ export default function GlobalSubjectsPage() {
               <h3 className="font-bold text-xl text-slate-900 mb-3">{sub.name}</h3>
               <div className="mt-auto pt-2">
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-50 text-slate-600 border border-slate-200">
-                  <Building2 size={14} className="text-slate-400" />
+                  {/* <Building2 size={14} className="text-slate-400" /> */}
                   Offered in {sub.institutions.length} institution{sub.institutions.length !== 1 ? 's' : ''}
                 </span>
               </div>

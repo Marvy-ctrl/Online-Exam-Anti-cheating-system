@@ -1,6 +1,6 @@
 "use client"
 import React, { useEffect, useState } from 'react'
-import { Activity, ShieldAlert, GraduationCap, Building2, CheckCircle2, PlayCircle } from 'lucide-react'
+import { Activity, ShieldAlert, GraduationCap, Building2, CheckCircle2, PlayCircle, TriangleAlert, Users } from 'lucide-react'
 import { apiFetch } from '@/src/lib/api'
 
 interface ActivityItem {
@@ -99,7 +99,7 @@ export default function Dashboard() {
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
           <div className="flex justify-between items-start mb-4">
             <div className="p-2 bg-purple-50 text-purple-600 rounded-lg">
-              <GraduationCap size={20} />
+              <Users size={20} />
             </div>
           </div>
           <p className="text-3xl text-slate-900 font-bold mb-1">
@@ -112,7 +112,7 @@ export default function Dashboard() {
           <div className="absolute top-0 right-0 w-20 h-20 bg-red-50 rounded-bl-full -mr-10 -mt-10 pointer-events-none"></div>
           <div className="flex justify-between items-start mb-4 relative z-10">
             <div className="p-2 bg-red-50 text-red-600 rounded-lg">
-              <ShieldAlert size={20} />
+              <TriangleAlert size={20} />
             </div>
           </div>
           <p className="text-3xl text-slate-900 font-bold mb-1 relative z-10">

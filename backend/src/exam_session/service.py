@@ -774,8 +774,12 @@ class ExamSessionService:
         v_res = await session.exec(v_stmt)
         violations = v_res.all()
         
-        # 3. Fetch Snapshots
-        s_stmt = select(Snapshot).where(Snapshot.session_uid == exam_session.uid).order_by(Snapshot.timestamp)
+        # 3. Fetch Snapshots (only recent ones; anything older than 7 days is purged from storage)
+        seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
+        s_stmt = select(Snapshot).where(
+            Snapshot.session_uid == exam_session.uid,
+            Snapshot.timestamp >= seven_days_ago
+        ).order_by(Snapshot.timestamp)
         s_res = await session.exec(s_stmt)
         snapshots = s_res.all()
 
