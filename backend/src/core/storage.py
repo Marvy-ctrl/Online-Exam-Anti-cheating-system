@@ -128,24 +128,13 @@ class StorageService:
 
     def generate_presigned_url(self, object_key: str) -> str:
         """
-        Generates a 15-minute secure presigned URL for an examiner to retrieve the snapshot from MinIO.
-        If MinIO is disabled or fails, returns a fallback static URL or the object key directly.
+        Returns a proxied API URL instead of a direct MinIO presigned URL.
+        This completely bypasses AWS Signature 'Host' header mismatch issues
+        when the browser accesses localhost but MinIO expects the 'minio' hostname.
         """
         if not self.minio_available or not self.minio_client or not object_key:
             return object_key
 
-        try:
-            url = self.minio_client.presigned_get_object(
-                bucket_name=self.bucket_name,
-                object_name=object_key,
-                expires=timedelta(minutes=15),
-            )
-            # Allow browser to resolve localhost instead of the docker-internal 'minio' hostname
-            if "minio:9000" in url and "localhost" in Config.DOMAIN:
-                url = url.replace("minio:9000", "localhost:9000")
-            return url
-        except Exception as e:
-            logger.warning(f"Failed to generate MinIO presigned URL: {e}")
-            return f"/static/snapshots/{object_key}"
+        return f"{Config.DOMAIN}/api/v1/exam_session/storage/snapshot/{object_key}"
 
 storage_service = StorageService()

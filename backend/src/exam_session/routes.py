@@ -3,8 +3,9 @@ import json
 from src.auth.dependencies import AccessTokenBearer
 from src.analytics.router import access_token_bearer
 from fastapi import APIRouter, Depends, status, WebSocket, WebSocketDisconnect, BackgroundTasks, HTTPException, Response, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from src.websocket import manager
+from src.core.storage import storage_service
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.db.main import get_session
@@ -418,3 +419,24 @@ async def exam_monitor_websocket_endpoint(
     except Exception as e:
         print(f"Monitor WS Error: {e}")
         manager.disconnect_monitor(websocket, exam_uid)
+
+@exam_session_router.get("/storage/snapshot/{session_uid}/{snapshot_file}")
+async def fetch_snapshot_image(session_uid: str, snapshot_file: str):
+    """
+    Proxy endpoint to securely stream snapshots from MinIO.
+    This prevents AWS signature mismatch issues in local development.
+    """
+    if not storage_service.minio_available or not storage_service.minio_client:
+        raise HTTPException(status_code=404, detail="Storage not available")
+        
+    object_key = f"{session_uid}/{snapshot_file}"
+    try:
+        response = storage_service.minio_client.get_object(
+            storage_service.bucket_name, object_key
+        )
+        return StreamingResponse(
+            response.stream(32 * 1024), 
+            media_type="image/jpeg"
+        )
+    except Exception as e:
+        raise HTTPException(status_code=404, detail="Image not found")
