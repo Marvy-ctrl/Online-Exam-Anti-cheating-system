@@ -1,36 +1,35 @@
-import React from 'react'
-import Link from 'next/link'
-import { ArrowRight, Fingerprint, Eye, Brain, ShieldCheck } from 'lucide-react'
+import React from "react";
+import Link from "next/link";
+import { ArrowRight, Fingerprint, Eye, Brain, ShieldCheck } from "lucide-react";
 
 const features = [
-  { icon: Fingerprint, label: 'Identity Verification' },
-  { icon: Eye,         label: 'Browser Activity Monitoring' },
-  { icon: Brain,       label: 'Violation Detection' },
-  { icon: ShieldCheck, label: 'Secure Exam Sessions' },
-]
+  { icon: Fingerprint, label: "Identity Verification" },
+  { icon: Eye, label: "Browser Activity Monitoring" },
+  { icon: Brain, label: "Violation Detection" },
+  { icon: ShieldCheck, label: "Secure Exam Sessions" },
+];
 
 export default function Hero() {
   return (
     <section className="relative w-full overflow-hidden bg-white">
-
       {/* Subtle dark grid on white */}
       <div
         className="absolute inset-0 opacity-[0.035]"
         style={{
           backgroundImage: `linear-gradient(#000 1px, transparent 1px), linear-gradient(90deg, #000 1px, transparent 1px)`,
-          backgroundSize: '60px 60px',
+          backgroundSize: "60px 60px",
         }}
       />
 
       <div className="relative max-w-5xl mx-auto px-6 pt-20 pb-18 flex flex-col items-center text-center">
-
         {/* Badge */}
         <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-blue-200 bg-blue-50 text-blue-600 text-[11px] font-semibold uppercase tracking-widest mb-7">
-          <span className="relative flex h-1.5 w-1.5">
+          {/* <span className="relative flex h-1.5 w-1.5">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-500 opacity-75" />
             <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-blue-600" />
-          </span>
-          REAL-TIME EXAM MONITORING        </div>
+          </span> */}
+          REAL-TIME EXAM MONITORING{" "}
+        </div>
 
         {/* Headline */}
         <h1 className="text-5xl sm:text-6xl font-bold text-slate-900 leading-none tracking-tight mb-5 max-w-4xl">
@@ -40,7 +39,8 @@ export default function Hero() {
         {/* Subheading */}
         <p className="text-slate-500 text-lg font-medium max-w-xl mb-10 leading-snug">
           A secure online examination platform with identity verification,
-          real-time monitoring, browser activity tracking, and examiner oversight.
+          real-time monitoring, browser activity tracking, and examiner
+          oversight.
         </p>
 
         {/* CTAs — students receive links via email, no Enter Exam here */}
@@ -51,7 +51,10 @@ export default function Hero() {
             className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-xl font-semibold text-sm transition-colors duration-200 group"
           >
             Get Started
-            <ArrowRight size={16} className="group-hover:translate-x-0.5 transition-transform duration-200" />
+            <ArrowRight
+              size={16}
+              className="group-hover:translate-x-0.5 transition-transform duration-200"
+            />
           </Link>
           <Link
             href="/login"
@@ -73,13 +76,14 @@ export default function Hero() {
                 <div className="w-9 h-9 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center group-hover:bg-blue-100 transition-colors duration-200">
                   <Icon size={16} className="text-blue-600" />
                 </div>
-                <p className="text-slate-800 text-xs font-semibold text-center">{label}</p>
+                <p className="text-slate-800 text-xs font-semibold text-center">
+                  {label}
+                </p>
               </div>
             ))}
           </div>
         </div>
-
       </div>
     </section>
-  )
+  );
 }

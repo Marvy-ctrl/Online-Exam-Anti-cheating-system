@@ -38,9 +38,9 @@ export default function Header() {
           {/* Desktop nav */}
           <div className="hidden md:flex items-center gap-8">
             <div className="flex gap-7 text-sm font-medium text-slate-500">
-              <Link href="#features" className="hover:text-slate-900 transition-colors duration-200">Features</Link>
-              <Link href="#how-it-works" className="hover:text-slate-900 transition-colors duration-200">How it works</Link>
-              {/* <Link href="#security" className="hover:text-slate-900 transition-colors duration-200">Security</Link> */}
+              <Link href="/#features" className="hover:text-slate-900 transition-colors duration-200">Features</Link>
+              <Link href="/#how-it-works" className="hover:text-slate-900 transition-colors duration-200">How it works</Link>
+              <Link href="/guide" className="hover:text-slate-900 transition-colors duration-200">How to Use</Link>
             </div>
 
             <div className="flex items-center gap-3">
@@ -68,17 +68,20 @@ export default function Header() {
           </button>
         </div>
 
-        {/* Mobile menu */}
         {isOpen && (
           <div className="md:hidden mt-4 pb-4 space-y-1 border-t border-slate-100 pt-4">
-            {['Features', 'How it works', 'Security'].map((item) => (
+            {[
+              { label: 'Features', href: '/#features' },
+              { label: 'How it works', href: '/#how-it-works' },
+              { label: 'How to Use', href: '/guide' }
+            ].map((item) => (
               <Link
-                key={item}
-                href={`#${item.toLowerCase().replace(' ', '-')}`}
+                key={item.label}
+                href={item.href}
                 className="block px-3 py-2 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-lg transition-colors"
                 onClick={() => setIsOpen(false)}
               >
-                {item}
+                {item.label}
               </Link>
             ))}
             <div className="flex flex-col gap-2 pt-3">
