@@ -1,0 +1,321 @@
+CHAPTER THREE
+METHODOLOGY
+
+TABLE OF CONTENTS
+- 3.1 Research Design and Architecture
+  - 3.1.1 System Overview
+  - 3.1.2 System Architecture Diagram
+  - 3.1.3 Explanation of System Components
+  - 3.1.4 Database Design (Entity Relationship Diagram)
+  - 3.1.5 System Process and Interaction Design
+- 3.2 Real-Time Event Monitoring and Handling
+  - 3.2.1 Types of Events Captured
+  - 3.2.2 Event Transmission and Asynchronous Offloading
+  - 3.2.3 Rule-Based and Biometric Event Evaluation
+  - 3.2.4 Event Logging and Violation Handling
+- 3.3 Tools, Frameworks, and Technologies
+- 3.4 System Workflow
+- 3.5 Use Case Diagram
+
+---
+
+This study adopts a design and implementation-based methodology, focusing on the development and evaluation of an E-Examination Cheating Control System (ExamLoc). The methodology involves requirement analysis, system design, component implementation (programming), testing, and integration under real examination-like scenarios. 
+
+To bridge the gap between initial design and final implementation, the methodology incorporates both client-side tracking and an asynchronous, server-side biometric verification pipeline to support a scalable, secure, and user-responsive digital exam environment.
+
+---
+
+3.1 Research Design and Architecture
+
+3.1.1 System Overview
+This system introduces an approach that tackles cheating in online examinations through the development of a real-time e-examination monitoring and biometric verification system. This setup is built around a hybrid synchronous/asynchronous architecture that monitors students' activities during examinations, helping to identify suspicious behaviors and verify physical identity.
+
+The system functions by tracking candidate actions in the browser and capturing periodic webcam frames, transmitting them to the backend in real time. FastAPI serves as the backend routing core, facilitating database transactions, user session states, and client endpoints. To support live monitoring updates, the system utilizes WebSockets, streaming behavioral violations directly to examiner dashboards.
+
+Crucially, to prevent server performance degradation under heavy computational load, the system separates browser-level event analysis from face recognition. While browser focus and right-click actions are checked using deterministic frontend and backend rule-based logic, face verification is offloaded to an asynchronous task queue. The backend leverages a biometric pipeline containing grayscale quality checks (evaluating luminance and sharpness), face localization (HOG detector), and a pre-trained ResNet-34 neural network to extract 128-dimensional facial vectors. These vectors are verified against the student’s enrolled template using Euclidean distance comparisons.
+
+Separating the exam interface from heavy biometric processing keeps the system fast and prevents any lag or interruptions for the student.
+
+3.1.2 System Architecture Diagram
+The system architecture diagram illustrates the structural design of the online examination monitoring system. It presents how the student client environment, backend FastAPI server, Celery task queue, databases, and examiner monitor interface interact to enable real-time monitoring and biometric evaluation.
+
+```mermaid
+graph TD
+    %% Tiers definition
+    subgraph Client_Tier [Client Interface Tier]
+        StudentApp["Student Exam Shell (Next.js)"]
+        ExaminerApp["Examiner Dashboard (Next.js)"]
+    end
+
+    subgraph Logic_Tier [Application & Routing Tier]
+        FastAPI["FastAPI Backend Server"]
+    end
+
+    subgraph Async_Tier [Asynchronous Task Tier]
+        Redis["Redis Message Broker"]
+        Celery["Celery Background Worker"]
+    end
+
+    subgraph Data_Tier [Data & Persistence Tier]
+        PostgreSQL[("PostgreSQL Database")]
+        MinIO[("MinIO S3 Object Storage")]
+        LocalFS[("Local Filesystem Fallback")]
+    end
+
+    %% Data Flow Connections
+    StudentApp -->|HTTP REST: Save Answers / Auth| FastAPI
+    StudentApp -->|WebSocket: Heartbeat & Live Actions| FastAPI
+    StudentApp -->|Webcam snapshots every 20s| FastAPI
+
+    FastAPI -->|Write metadata & logs| PostgreSQL
+    FastAPI -->|Push heavy face/grading tasks| Redis
+    Redis -->|Dequeue tasks| Celery
+
+    Celery -->|Write face match results / grades| PostgreSQL
+    Celery -->|Upload violation snapshots| MinIO
+    MinIO -.->|Offline Fallback| LocalFS
+
+    FastAPI -->|Publish alerts| Redis
+    Redis -->|Subscribe & push updates| FastAPI
+    FastAPI -->|WebSocket: Live violation feed| ExaminerApp
+    ExaminerApp -->|HTTP REST: View audit logs| FastAPI
+```
+
+Events generated from the student’s device are transmitted via REST endpoints or a persistent WebSocket connection. While simple event data and answers are written directly to PostgreSQL, biometric snapshots and heavy calculations are queued through Redis to Celery background workers. The results are logged, and live violation alerts are broadcast back to the examiner dashboard.
+
+The system consists of four main architectural tiers:
+1. **Client-Side Monitoring Agent (Next.js)**: Operates within the candidate’s web browser during an active exam. It renders exam content, captures behavioral events (tab switches, focus loss), blocks unauthorized inputs (right-clicks, copy actions), and grabs periodic webcam frames.
+2. **Server-Side Application Layer (FastAPI)**: Serves as the core logic layer. It manages authentication, controls session timelines, receives monitoring streams, and writes metadata to the database.
+3. **Asynchronous Processing Layer (Celery & Redis)**: Handles CPU-heavy transactions. It processes incoming webcam snapshots, runs quality checks, extracts face embeddings, performs biometric matches, and executes MCQ autograding tasks.
+4. **Data & Storage Layer (PostgreSQL & MinIO)**: Persists metadata (users, exams, logs) in PostgreSQL using SQLModel, and stores physical audit snapshots in MinIO object storage with an automated 7-day lifecycle deletion policy.
+
+3.1.3 Explanation of System Components
+The proposed system is structured as a multi-component architecture. Each component performs a specific role and collaborates to ensure continuous supervision during examination sessions:
+
+1. **Student Interface (Next.js Client)**:
+   Runs directly in the browser to deliver exam content and monitor student behavior. It tracks tab switching, captures focus loss events, and blocks input actions (such as copy, paste, and text selection). Answers are synced back incrementally via a fault-tolerant auto-save request loop.
+
+2. **Biometric Pipeline (face_recognition / dlib)**:
+   Executes image quality validation and face verification workflows. It enforces a grayscale quality gate to check image brightness and contrast before running a pre-trained ResNet-34 neural model. The model computes 128-dimensional biometric embeddings and compares face similarity via Euclidean distance math.
+
+3. **Asynchronous Task Queue (Celery & Redis)**:
+   Buffers and offloads heavy background operations from the web gateway. The FastAPI router pushes time-consuming face evaluations and MCQ auto-grading tasks to the Redis queue, allowing the Celery workers to process them asynchronously without freezing the user interface.
+
+4. **Real-Time Communication Hub (WebSocket & Redis Pub/Sub)**:
+   Facilitates low-latency messaging. It keeps a persistent connection open between active browsers and the server. When behavioral anomalies are flagged, the backend publishes the violations to a Redis Pub/Sub channel, broadcasting alerts immediately to supervising examiners.
+
+5. **Persistence Layer (PostgreSQL & SQLModel)**:
+   Manages core relational data storage. Using SQLModel as the database mapping framework, it stores user roles, configurations, exam templates, and event records, relying on indexing and unique composite constraints to secure multi-tenant access.
+
+6. **Secure Object Storage System (MinIO & Local Fallback)**:
+   Hosts and protects proctoring snapshot records. Suspicious base64 frames are converted to binaries and stored using obfuscated UUID paths. If the storage service goes offline, files write to local directories automatically, proxied behind strict backend auth checks.
+
+7. **Examiner Dashboard (Next.js Proctor)**:
+   Provides a central workspace for administrators. It updates in real time to show active candidates, live webcam thumbnails, aggregated violation alerts, and timeline streams for proactive exam supervision.
+3.1.4 Database Design (Entity Relationship Diagram)
+The database design plays a crucial role in maintaining system state, tracking candidate sessions, and preserving audit-trail integrity. The conceptual data model is structured around relational entities that manage institutional boundaries, exam configurations, student enrollments, exam sessions, real-time proctoring snapshots, and registered violations.
+
+The following Entity Relationship Diagram (ERD) defines the logical connections and cardinalities between these entities:
+
+```mermaid
+erDiagram
+    ADMIN ||--o{ INSTITUTION : manages
+    ADMIN ||--o{ EXAM : creates
+    INSTITUTION ||--o{ SUBJECT : hosts
+    INSTITUTION ||--o{ STUDENT : registers
+    SUBJECT ||--o{ EXAM : categorizes
+    STUDENT ||--o{ SUBJECT_ENROLLMENT : completes
+    SUBJECT ||--o{ SUBJECT_ENROLLMENT : receives
+    EXAM ||--o{ EXAM_ENROLLMENT : assigns
+    STUDENT ||--o{ EXAM_ENROLLMENT : undergoes
+    EXAM ||--o{ EXAM_SESSION : records
+    EXAM_ENROLLMENT ||--o{ EXAM_SESSION : initializes
+    EXAM ||--o{ QUESTION : contains
+    QUESTION ||--o{ OPTIONS : offers
+    EXAM_SESSION ||--o{ STUDENT_ANSWERS : submits
+    QUESTION ||--o{ STUDENT_ANSWERS : evaluates
+    EXAM_SESSION ||--o{ SNAPSHOT : captures
+    EXAM_ENROLLMENT ||--o{ SNAPSHOT : references
+    EXAM_SESSION ||--o{ VIOLATION : incurs
+    EXAM_ENROLLMENT ||--o{ VIOLATION : logs
+```
+
+The database architecture leverages foreign key relationships and indices (specifically on `exam_id`, `student_id`, and event `timestamps`) to optimize data retrieval speeds under high concurrency, ensuring that real-time monitoring events do not lock key relational tables.
+
+3.1.5 System Process and Interaction Design
+To capture the dynamic relationships between the user interfaces, the API gateway, the task worker queue, and the proctoring monitor, the system is designed around two critical interaction sequences:
+
+1. **Pre-Exam Biometric Verification & Exam Entry Sequence**:
+   Before the student can view examination questions, their identity must be verified against their enrolled biometric template. The client captures a live webcam frame and submits it to the backend. The backend matches the 128-dimensional embedding, generates a time-bound session key, and initializes the countdown.
+
+2. **Periodic Asynchronous Proctoring & Alert Sequence**:
+   During the exam, behavioral and biometric telemetry are sent continuously. While browser events (visibility changes) trigger instant WebSocket broadcasts to the examiner, webcam snapshots are routed through a background worker to avoid UI freezes.
+
+The following sequence diagram outlines the asynchronous periodic face verification and proctor streaming pipeline:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Student as Student Browser
+    participant API as FastAPI Web Server
+    participant Redis as Redis Queue / PubSub
+    participant Worker as Celery Worker
+    participant DB as PostgreSQL DB
+    actor Examiner as Examiner Dashboard
+
+    %% Periodic Face Snapshot Flow
+    Student->>API: POST /verify-face (Base64 webcam frame)
+    API->>Redis: Enqueue verify_face_task
+    API-->>Student: Return immediate HTTP 200 (queued)
+    Redis->>Worker: Dequeue task
+    Worker->>Worker: Run Luminance & Sharpness Gates
+    Worker->>Worker: Compute 128-d Embedding & Euclidean Match
+    
+    alt Verification Match Successful
+        Worker->>DB: Log successful face check
+    else Verification Mismatch or Face Absent
+        Worker->>DB: Log violation and update violation count
+        Worker->>DB: Save violation metadata
+        Worker->>Redis: Publish WS alert (student_id, violation_type)
+        Redis->>API: Push WS alert to active monitors
+        API->>Examiner: Stream WebSocket warning event
+    end
+```
+
+---
+
+3.2 Real-Time Event Monitoring and Handling
+
+3.2.1 Types of Events Captured
+During an exam, the client-side monitoring agent and server-side worker continuously observe and capture specific indicators:
+- **Browser Tab Switching**: Triggers when visibility API reports the page is hidden.
+- **Window Focus Loss (Blur)**: Triggers when the active browser focus shifts to another app.
+- **Webcam Availability (Face Absence)**: Captures if the video stream cuts out or if no face is localized.
+- **Multiple Face Presence**: Captures if the localized face count exceeds one.
+- **Biometric Identity Mismatch**: Flags if the Euclidean distance between the live capture and reference template is 0.40 or higher.
+- **Clipboard/Right-Click Violations**: Intercepts copy-paste actions and context menu clicks.
+- **Network Interruptions**: Triggers when WebSocket heartbeats are missed.
+
+3.2.2 Event Transmission and Asynchronous Offloading
+To ensure consistent monitoring without affecting client browser performance or server responsiveness, the system uses two main transmission strategies:
+- **Immediate Behavioral Events**: Simple events (tab switches, focus loss) are sent as HTTP POST requests with `keepalive: true` configured. This forces the browser to complete the network request even if the tab is immediately shut down. Simultaneously, these events are sent over the active WebSocket channel for live monitor broadcasts.
+- **Heavy Biometric Checkloads**: Base64-encoded webcam snapshots are posted every 20 seconds. Instead of making the client wait for image decoding and vector comparison, the FastAPI router serializes the payload, pushes it onto the Redis task queue, and returns an immediate response (HTTP 200 "queued"). The Celery background workers dequeue the task and run the biometric inference asynchronously.
+
+3.2.3 Rule-Based and Biometric Event Evaluation
+Once an event reaches the server, it is directed to the appropriate evaluation handler:
+- **Rule-Based Evaluation (Behavioral & Biometric Status)**: Employs a continuous logging policy with zero baseline tolerance. The system does not ignore minor or initial occurrences; instead, every single event—including the very first instance of a tab switch, window focus loss, face absence, or multiple faces detection—is logged immediately in the PostgreSQL database and streamed in real time to the examiner dashboard via WebSockets. The examiner's panel displays these cumulative violation logs as an audit timeline, allowing the human supervisor to review the full behavioral record of the candidate.
+- **Biometric Matching Evaluation (Identity)**: Uses mathematical vector math. The system calculates the Euclidean distance ($d$) between the live embedding vector ($\vec{E}_{\text{live}}$) and the enrolled baseline template ($\vec{E}_{\text{enrolled}}$):
+  $$d = \sqrt{\sum_{k=1}^{128} (E_{\text{enrolled}, k} - E_{\text{live}, k})^2}$$
+  If the distance is below 0.40, the match passes. A distance of 0.40 or above indicates a biometric mismatch, raising a violation alert.
+
+3.2.4 Event Logging and Violation Handling
+When a violation is confirmed, the system:
+1. Generates a unique log record containing the student's identifier, session ID, violation type, timestamp, and metadata.
+2. Writes the record to PostgreSQL, updating the active session's running violation counter.
+3. If a violation is flagged (e.g., face mismatch or tab switch), the worker writes the binary image payload to the MinIO storage bucket, linking the snapshot URL to the violation record.
+4. Streams the violation alert immediately over WebSockets to the examiner dashboard via Redis Pub/Sub, updating the live examiner interface.
+
+---
+
+3.3 Tools, Frameworks, and Technologies
+
+The system relies on a carefully selected tech stack to coordinate real-time tracking, biometric calculations, and secure data storage:
+
+- **Backend: FastAPI (Python)**: Provides high-throughput asynchronous REST and WebSocket request handling.
+- **Database ORM: SQLModel**: Combines SQLAlchemy and Pydantic, ensuring type-safe database queries and automated data validation schemas.
+- **Database Engine: PostgreSQL**: Persists structured relational data, using indices (e.g., on student ID and exam ID) and composite unique constraints to guarantee multi-tenant security.
+- **Task Broker & Queue: Redis & Celery**: Brokers tasks and runs background workers to handle CPU-bound biometrics and asynchronous grading computations.
+- **Biometrics Pipeline: dlib & face_recognition**: Powers face localization and 128-d vector embedding extraction via a pre-trained ResNet-34 neural model.
+- **Object Storage: MinIO (S3-Compatible)**: Handles raw image snapshots. Configured with a 7-day lifecycle deletion rule (`LifecycleConfig`) to automate GDPR storage limitation compliance.
+- **Frontend: Next.js (React), TypeScript, & TailwindCSS**: Renders the candidate exam environment, intercepts input controls, and powers the examiner proctoring dashboard.
+- **Testing Tools: Pytest & Restfox**: Pytest executes the automated testing matrix (12 core test cases, TC-01 to TC-12) to verify security and fault tolerance, while Restfox verifies endpoint functionality.
+
+| Category | Tools / Technologies | Purpose in ExamLoc System |
+| :--- | :--- | :--- |
+| **Backend API Core** | FastAPI (Python) | High-performance API routing, WS connection management, and session gatekeeper. |
+| **Database ORM** | SQLModel | Bridges PostgreSQL and python models with integrated Pydantic schema validation. |
+| **Database Persistence** | PostgreSQL | Secure relational store for student vectors, sessions, and violation histories. |
+| **Worker Queue** | Celery & Redis | Offloads face inference, image decoding, email delivery, and MCQ scoring. |
+| **Biometrics Engine** | `face_recognition` | Quality gate validation (luminance/blur) and 128-d face embedding matching. |
+| **Audit Storage** | MinIO Object Storage | Private storage for proctor snapshots, enforcing 7-day retention deletion rules. |
+| **Frontend Shell** | Next.js & TypeScript | Candidate exam interface, event listeners, and live examiner dashboard. |
+| **Styling Library** | TailwindCSS | Responsive, clean visual interface design. |
+| **Version Control** | Git | Tracks modifications and maintains development code integrity. |
+
+---
+
+3.4 System Workflow
+
+The system workflow illustrates the step-by-step operation of the proposed online examination monitoring system:
+
+1. **Administrator Pre-Enrollment**: The examiner registers student credentials (ID, email) inside the admin panel, generating a tokenized, single-use enrollment link.
+2. **Biometric Student Enrollment**: 
+   - The student opens the enrollment link.
+   - The frontend captures 5 webcam photos.
+   - The backend runs luminance and sharpness checks. 
+   - Passing embeddings are averaged element-wise ($\vec{E}_{\text{enrolled}} = \frac{1}{M} \sum \vec{E}_j$) and saved as the baseline reference template, changing student status to `enrolled`.
+3. **Exam Session Verification Gate**: On exam start, the student logins. The system captures a live webcam frame, checks quality, and verifies it against the reference template. If Euclidean distance < 0.40, a JWT cookie (`exam_auth_token`) is issued, and the student enters the exam hall. The server locks the session's `expected_end_time`.
+4. **Active Exam & Event Tracking**: As the candidate answers questions, their selections are sent via an auto-save loop with a 3-retry network fallback. Simultaneously, browser visibility and blur focus listeners capture any tab switching or navigation actions, posting them to the violation endpoint immediately.
+5. **Periodic Facial Checks**: Every 20 seconds, the client sends a live frame snapshot. FastAPI forwards this to Celery asynchronously. If a violation is found (mismatch, multiple faces, face absent), the snapshot is stored, and a violation entry is added to PostgreSQL.
+6. **Real-Time Proctor Broadcast**: When a violation is written, the ConnectionManager broadcasts the alert via Redis Pub/Sub to examiner WebSockets, updating the live monitoring dashboard immediately.
+7. **Exam Autograding & Reporting**: Upon submission or server-side deadline expiry, the Celery autograder scores the exam, persists the grade, and completes the session. Full violation summaries are exported for administrator auditing.
+
+The corresponding logical flow of these steps, showing how client action and server-side verification interact, is presented in the system design flowchart below:
+
+```mermaid
+graph TD
+    %% Styling
+    classDef startEnd fill:#ECEFF1,stroke:#37474F,stroke-width:3px,font-size:15px,font-weight:bold,color:#1A1A1A;
+    classDef process fill:#E1F5FE,stroke:#0288D1,stroke-width:3px,font-size:14px,font-weight:bold,color:#1A1A1A;
+    classDef gate fill:#E8F5E9,stroke:#2E7D32,stroke-width:3px,font-size:14px,font-weight:bold,color:#1A1A1A;
+    classDef active fill:#FFF3E0,stroke:#EF6C00,stroke-width:3px,font-size:14px,font-weight:bold,color:#1A1A1A;
+    classDef alert fill:#FFEBEE,stroke:#C62828,stroke-width:3px,font-size:14px,font-weight:bold,color:#1A1A1A;
+    classDef decision fill:#FFF9C4,stroke:#FBC02D,stroke-width:3px,font-size:14px,font-weight:bold,color:#1A1A1A;
+
+    Start([**1. Admin Pre-Enrollment**]) --> |Generate Token Link| Enroll[**2. Student Biometric Enrollment**]
+    Enroll --> Capture5{**Capture 5 Photos & Run Quality Gate**}
+    Capture5 -->|Pass| CreateTemplate[**Average Embeddings & Save Baseline Template**]
+    Capture5 -->|Fail| RetryEnroll[**Retry Photo Capture**] --> Enroll
+    
+    CreateTemplate --> |Set Status: Enrolled| LoginGate[**3. Exam Session Verification Gate**]
+    LoginGate --> LiveCapture{**Capture Live Frame & Match Baseline**}
+    LiveCapture -->|Euclidean Dist < 0.40| AuthSuccess[**Issue JWT Token & Start Exam Countdown**]
+    LiveCapture -->|Euclidean Dist >= 0.40| DenyAccess[**Access Denied / Flag Face Mismatch**]
+    
+    AuthSuccess --> ActiveExam[**4. Active Exam Shell & Client Monitoring**]
+    
+    subgraph Client_Proctoring [Active Proctoring Loop]
+        ActiveExam --> FocusCheck{**Tab Switch / Focus Loss?**}
+        FocusCheck -->|Yes| LogBehave[**HTTP POST: Log Violation & Send WS Alert**]
+        
+        ActiveExam --> FaceCheck{**Periodic webcam snapshot every 20s**}
+        FaceCheck --> QueuedRedis[**FastAPI Queue Snapshot to Redis**]
+        QueuedRedis --> CeleryProcess[**Celery Run Face Detection & Recognition**]
+        CeleryProcess --> MatchCheck{**Face Match / Present?**}
+        MatchCheck -->|No / Mismatch| LogBiometric[**MinIO: Save snapshot; DB: Increment count**]
+        LogBiometric --> WebSocketPush[**Redis Pub/Sub -> FastAPI WebSocket -> Proctor Alert**]
+    end
+    
+    ActiveExam --> SubmitStep[**7. Final Submission or Timer Expiration**]
+    SubmitStep --> Autograde[**Celery Auto-grades MCQ responses**]
+    Autograde --> CompleteSession[**Save final score & Generate audit report**]
+    CompleteSession --> End([**End Session**])
+    
+    class Start,End startEnd;
+    class Enroll,CreateTemplate,SubmitStep,CompleteSession process;
+    class LoginGate,AuthSuccess,QueuedRedis,CeleryProcess gate;
+    class ActiveExam active;
+    class DenyAccess,LogBehave,LogBiometric,WebSocketPush,RetryEnroll alert;
+    class Capture5,LiveCapture,FocusCheck,FaceCheck,MatchCheck decision;
+```
+
+!Figure 3.3: System Design Flowchart
+*(Note: The rendered high-resolution image is stored in report/images/system_flowchart.png)*
+
+---
+
+3.5 Use Case Diagram
+The use case diagram illustrates the functional requirements of the ExamLoc system, defining the interactions between the primary actors (Student and Administrator/Proctor) and the core monitoring engine.
+
+!Figure 3.2: System Use Case Diagram
+*(Note: The rendered high-resolution image is stored in report/images/use_case_diagram.png)*

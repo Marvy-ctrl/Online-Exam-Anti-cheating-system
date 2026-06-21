@@ -1,0 +1,63 @@
+PROJECT DEFENSE GUIDE
+Design and Implementation of an Intelligent Online Examination System with Real-Time Anti-Cheating Mechanisms
+Candidate: POPOOLA MARVELLOUS IBUKUNOLUWA (22/01DL103)
+
+=============================================================================
+PART 1: PRESENTATION OUTLINE (How to pitch your project)
+=============================================================================
+
+1. INTRODUCTION & PROBLEM STATEMENT
+- Start strong: Online exams are the future, but cheating is the biggest barrier. 
+- Mention the stats: Self-reported cheating jumped from 29.9% to 54.7% during the shift to online learning.
+- The Problem: Standard online exams rely on passwords and maybe browser lockdowns, but these don't stop impersonation, using external devices (like a phone off-camera), or a friend sitting next to the student.
+- Your Solution: ExamLoc, a real-time, zero-trust system that monitors both behavioral and biometric indicators continuously.
+
+2. SYSTEM ARCHITECTURE (The "How It Works" Section)
+- Keep it high-level but technical enough to impress.
+- Frontend: Next.js (Client-side tracking, capturing webcams, blocking right-clicks).
+- Backend API: FastAPI (Extremely fast, handles WebSockets and database routing).
+- Asynchronous Workers: Celery + Redis (This is your "secret weapon" to prevent server crashes).
+- Storage/Database: PostgreSQL (metadata and logs) and MinIO (S3 object storage for violation images).
+
+3. KEY FEATURES (What makes your system special)
+- Biometric Enrollment & Verification: Taking 5 photos, averaging them for a baseline, and checking live frames against this baseline during the exam.
+- The Quality Gates: Explain how the system rejects dark (Luminance < 60) or blurry (Variance < 80) photos.
+- Behavioral Tracking: Tracking when a student switches tabs, clicks away (focus loss), or has multiple faces in the camera frame.
+- Real-Time Alerts: WebSockets push alerts instantly to the examiner dashboard via Redis Pub/Sub.
+
+4. RESULTS & EVALUATION
+- Highlight your threshold logic: You tested thresholds and found 0.40 to be the sweet spot (FRR of 1.20% and FAR of 0.08%).
+- Highlight latency: Offloading face recognition to Celery takes 850ms, but the student's browser never freezes because FastAPI responds in just 18ms.
+
+=============================================================================
+PART 2: POTENTIAL EXAMINER QUESTIONS & WINNING ANSWERS
+=============================================================================
+
+Q1: Why did you choose to use Celery and Redis for face verification instead of just doing it directly in the backend?
+A: Face recognition (running HOG and ResNet-34) is very CPU-intensive. It takes about 850ms to process one frame. If I did this directly in the FastAPI route, the web server would freeze, and other students wouldn't be able to submit their answers or load pages. By pushing the image to a Redis queue and having a background Celery worker process it, FastAPI immediately responds to the student in 18ms, keeping the exam smooth and lag-free while the heavy lifting happens in the background.
+
+Q2: How do you handle network failures or power outages during the exam?
+A: The system relies on a continuous auto-save mechanism. Every time a student selects an option, it triggers an HTTP request. If the network drops, the frontend initiates a "3-retry loop". If all retries fail, it alerts the student. If their PC goes off, their session state (time remaining, saved answers) is securely preserved in the PostgreSQL database, so they can log back in and resume exactly where they left off without losing any data.
+
+Q3: Why did you set the Euclidean distance threshold to 0.40?
+A: 0.40 is the optimal mathematical tradeoff. If I made it stricter (e.g., 0.30), the system would throw false alarms just because the student tilted their head or the lighting changed (15% False Rejection Rate). If I made it more lenient (e.g., 0.50), it would allow people with similar facial structures to cheat (4% False Acceptance Rate). 0.40 provides maximum security (0.08% FAR) with minimal disruption to honest students.
+
+Q4: What happens if the student changes their computer's clock to buy more time?
+A: The countdown timer on the frontend is purely visual. Security is "Server-Authoritative". When the exam starts, the backend calculates the exact 'expected_end_time' and locks it in the database. When the student submits answers, the server checks the current server time against the database deadline. If the time has passed, the submission is rejected, making client-side time tampering impossible.
+
+Q5: Are there privacy concerns with storing students' faces?
+A: Yes, which is why the system was designed with "Biometric Minimization" and GDPR compliance in mind. Raw images of students are not saved to the hard drive during normal face checks—they are processed in memory and discarded if there is a match. An image is ONLY permanently saved to the MinIO object storage if a violation (like cheating or a face mismatch) is flagged, serving as audit evidence. Furthermore, an automated lifecycle policy deletes all snapshots after 7 days.
+
+Q6: How does the system prevent a student from just covering their webcam?
+A: If the webcam is covered or blocked, the HOG face detector will return zero localized faces. The system flags this as a "Face Absence" violation and immediately logs it in the database while sending a real-time WebSocket alert to the examiner's dashboard.
+
+Q7: What is the limitation of your system?
+A: A primary limitation is the reliance on decent lighting and network bandwidth to send webcam snapshots. Also, while it tracks faces, it doesn't currently track eye-gaze (where exactly the student is looking on the screen). Adding WebGL-based gaze tracking and WebRTC for live video streaming are recommendations I've included for future work.
+
+=============================================================================
+PART 3: FINAL DEFENSE TIPS
+=============================================================================
+- BE CONFIDENT: You built a highly sophisticated system. Speak clearly.
+- DON'T RUSH: When asked a question, take 2 seconds to breathe, process it, and deliver a structured answer.
+- USE THE ARCHITECTURE: Whenever you explain something, point to your architecture diagram (FastAPI, Next.js, Celery). It shows you know exactly how the parts talk to each other.
+- TEST IT BEFOREHAND: Do a dry run of the system 1 hour before the defense. Ensure Redis and Celery workers are running.

@@ -51,6 +51,7 @@ class ExamSessionService:
         distance = compute_distance(stored_array, live_embedding)
         return distance < Config.FACE_SIMILARITY_THRESHOLD
 
+
     async def start_exam(
         self,
         exam_uid: str,
