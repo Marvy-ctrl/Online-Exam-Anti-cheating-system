@@ -24,7 +24,7 @@ ExamLoc is a professional-grade, high-integrity examination platform designed to
 - **Database**: PostgreSQL with SQLModel for type-safe data integrity.
 - **Real-time**: WebSockets for instantaneous violation broadcasting.
 
----
+----
 
 ## 🛠️ Setup Instructions
 
