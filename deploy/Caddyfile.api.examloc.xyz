@@ -1,0 +1,37 @@
+# ExamLoc API — Caddy site block for api.examloc.xyz
+#
+# If the project already on this VPS uses Caddy, append this to /etc/caddy/Caddyfile
+# and run: sudo caddy validate --config /etc/caddy/Caddyfile && sudo systemctl reload caddy
+#
+# Caddy obtains and renews TLS automatically — no certbot step.
+# It also proxies WebSocket upgrades natively, so no special handling is needed.
+
+api.examloc.xyz {
+	# Face enrollment sends five base64 JPEGs in one body.
+	request_body {
+		max_size 25MB
+	}
+
+	reverse_proxy 127.0.0.1:8100 {
+		# uvicorn runs with --proxy-headers; these let it build https:// URLs.
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+
+		# Long-lived proctoring WebSockets must not be timed out between heartbeats.
+		transport http {
+			read_timeout 3600s
+			write_timeout 3600s
+		}
+	}
+
+	encode gzip
+	log {
+		output file /var/log/caddy/examloc-api.log {
+			roll_size 10MB
+			roll_keep 3
+		}
+	}
+
+	# Do NOT add CORS headers here — FastAPI's CORSMiddleware already sets them
+	# from FRONTEND_URL, and duplicates cause the browser to reject the response.
+}

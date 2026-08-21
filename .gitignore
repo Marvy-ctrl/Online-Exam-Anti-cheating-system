@@ -46,3 +46,29 @@ next-env.d.ts
 __pycache__
 node_modules
 frontend/.next
+
+# Locally-stored webcam snapshots. These are real biometric captures and must
+# never be committed. The directory is recreated on boot by os.makedirs() in
+# backend/src/__init__.py:58 and backend/src/core/storage.py:119, so nothing
+# needs to track it. Matches backend/uploads/ at any depth.
+uploads/
+# Finder/rsync duplicate-name variants, e.g. "uploads 2/", "uploads copy/".
+uploads[ ]*/
+*[ ]2/
+
+# Redis persistence file — can contain queued task payloads.
+dump.rdb
+*.rdb
+
+# Local scratch/experiment area, not part of the app.
+scratch/
+
+# Thesis/report drafts — collaborator's convention (added upstream in 26e11ca).
+report/
+
+# Env files at ANY depth. The bare `.env` on line 1 only matches the repo root,
+# so nested secrets (frontend/.env.local, backend/src/.env) were unprotected.
+**/.env
+**/.env.*
+!**/.env.example
+!.env.production.example

@@ -12,6 +12,7 @@ from .schema import (
 )
 from src.db.main import get_session
 from src.auth.service import UserService
+from src.config import Config
 from src.dependencies.roles import Role
 from .utils import (
     hash_password,
@@ -170,7 +171,7 @@ async def login(
                 key="access_token",
                 value=access_token,
                 httponly=True,
-                secure=False,
+                secure=Config.COOKIE_SECURE,
                 samesite="lax",
                 max_age=15*60,
                 path="/"
@@ -179,8 +180,8 @@ async def login(
                 key="refresh_token",
                 value=refresh_token,
                 httponly=True,
-                secure=False,  
-                samesite="lax",  
+                secure=Config.COOKIE_SECURE,
+                samesite="lax",
                 max_age=REFRESH_TOKEN_EXPIRY * 24 * 60 * 60,
                 path="/"
             )
@@ -202,7 +203,7 @@ async def refresh_token(
         key="access_token",
         value=new_access_token,
         httponly=True,
-        secure=False,
+        secure=Config.COOKIE_SECURE,
         samesite="lax",
         max_age=15*60,
         path="/"

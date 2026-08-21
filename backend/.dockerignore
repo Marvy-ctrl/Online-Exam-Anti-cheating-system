@@ -5,6 +5,19 @@ __pycache__/
 .env
 venv/
 .venv/
+env/
+
+# `.env` above does NOT match nested paths, and src/.env is the exact file
+# pydantic-settings loads (see config.py model_config.env_file). Without this,
+# a local secrets file gets baked into an image layer.
+**/.env
+**/.env.*
+!**/.env.example
+src/.env
+
+# Redis dump — can contain broker payloads.
+dump.rdb
+*.log
 
 .git
 .gitignore

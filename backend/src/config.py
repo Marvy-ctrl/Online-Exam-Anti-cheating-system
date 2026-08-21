@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     CELERY_RESULT_BACKEND: str
 
     DB_SSL: bool = False
+    # Cookie Secure flag. False for local HTTP development; MUST be True in any
+    # deployment served over HTTPS, otherwise admin session cookies can be
+    # transmitted in cleartext. See auth/router.py.
+    COOKIE_SECURE: bool = False
     SMTP_HOST: str
     SMTP_PORT: int = 465
     SMTP_USER: str
