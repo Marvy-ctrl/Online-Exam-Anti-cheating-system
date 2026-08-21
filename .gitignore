@@ -60,8 +60,14 @@ uploads[ ]*/
 dump.rdb
 *.rdb
 
-# Local scratch/experiment area, not part of the app.
-scratch/
+# Local scratch/experiment area. The collaborator tracks analysis scripts here
+# intentionally (locustfile.py, generate_flowchart.py, ...), so only ignore the
+# data/output that collects alongside them — not the code.
+scratch/uploads/
+scratch/**/*.jpg
+scratch/**/*.png
+scratch/**/*.csv
+scratch/**/*.rdb
 
 # Thesis/report drafts — collaborator's convention (added upstream in 26e11ca).
 report/
