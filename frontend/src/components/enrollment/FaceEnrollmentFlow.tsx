@@ -192,9 +192,9 @@ export function FaceEnrollmentFlow({
       case 1: // Front — centered
         return noseRatioX > 0.42 && noseRatioX < 0.58 && noseRatioY > 0.38 && noseRatioY < 0.62;
       case 2: // Turn Left (nose moves toward right edge from camera POV)
-        return noseRatioX < 0.40;
-      case 3: // Turn Right (nose moves toward left edge from camera POV)
         return noseRatioX > 0.60;
+      case 3: // Turn Right (nose moves toward left edge from camera POV)
+        return noseRatioX < 0.40;
       case 4: // Chin Up (nose rises in frame)
         return noseRatioY < 0.42;
       case 5: { // Smile
