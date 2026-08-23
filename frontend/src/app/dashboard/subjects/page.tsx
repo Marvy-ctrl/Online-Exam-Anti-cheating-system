@@ -100,9 +100,7 @@ export default function GlobalSubjectsPage() {
         <div className="flex justify-center items-center py-20 text-slate-400">Loading subjects...</div>
       ) : groupedSubjects.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center flex flex-col items-center">
-          <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center text-blue-600 mb-4">
-            <BookOpen size={32} />
-          </div>
+        
           <h3 className="text-xl font-bold text-slate-900 mb-2">No subjects found</h3>
           <p className="text-slate-500 max-w-sm mb-6">You have not created any subjects yet. Go to an institution workspace to create your first subject.</p>
           <Link 

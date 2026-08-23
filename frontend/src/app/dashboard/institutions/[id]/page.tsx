@@ -259,7 +259,7 @@ export default function InstitutionWorkspace() {
                   }
                 }
               }}
-              className="px-4 py-2 bg-red-50 text-red-600 font-medium rounded-lg hover:bg-red-100 transition-colors flex items-center gap-2"
+              className="px-4 py-2 text-red-600 font-medium transition-colors flex items-center gap-2"
               title="Delete Workspace"
             >
               <Trash2 size={16}/> Delete
@@ -268,7 +268,7 @@ export default function InstitutionWorkspace() {
               onClick={() => setIsSubjectModalOpen(true)}
               className="px-4 py-2 bg-white border border-slate-200 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors flex items-center gap-2"
             >
-              <BookOpen size={16} className="text-blue-600"/> New Subject
+               New Subject
             </button>
             <button 
               onClick={() => setIsExamModalOpen(true)}
