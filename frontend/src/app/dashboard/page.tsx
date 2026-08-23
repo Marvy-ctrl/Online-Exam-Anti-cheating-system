@@ -79,13 +79,7 @@ export default function Dashboard() {
         </div>
 
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex justify-between items-start mb-4">
-           
-            <span className="flex h-2 w-2 relative">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-            </span>
-          </div>
+         
           <p className="text-3xl text-slate-900 font-bold mb-1">
             {loading ? "..." : overview?.active_exams_count ?? 0}
           </p>
