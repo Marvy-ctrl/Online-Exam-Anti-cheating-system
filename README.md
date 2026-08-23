@@ -101,4 +101,4 @@ Every component in this system is built with a **Zero Trust** model. We never tr
 
 ## 📝 License
 
-Proprietary / Research Project.
+Proprietary / Research Project...
