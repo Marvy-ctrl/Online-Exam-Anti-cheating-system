@@ -61,15 +61,48 @@ from fastapi.staticfiles import StaticFiles
 app.mount("/static", StaticFiles(directory=UPLOADS_DIR), name="static")
 
 
+def _cors_origins() -> list[str]:
+    """Build the CORS allowlist.
+
+    CORSMiddleware compares origins by exact string — it does no subdomain or
+    wildcard matching. `https://examloc.xyz` therefore does NOT cover
+    `https://www.examloc.xyz`, and a browser on the wrong one gets a preflight
+    rejection with no Access-Control-Allow-Origin header. Vercel serves both
+    hostnames, so register both forms of whatever FRONTEND_URL is set to.
+    """
+    from urllib.parse import urlparse
+
+    origins: list[str] = []
+    frontend = (Config.FRONTEND_URL or "").rstrip("/")
+
+    if frontend:
+        origins.append(frontend)
+        parsed = urlparse(frontend)
+        host = parsed.netloc
+        if host.startswith("www."):
+            origins.append(f"{parsed.scheme}://{host[4:]}")
+        else:
+            origins.append(f"{parsed.scheme}://www.{host}")
+
+    # Local dev origins. Gated on COOKIE_SECURE so they are absent in any HTTPS
+    # deployment: allow_credentials=True plus a permitted http://localhost origin
+    # would let anything listening on the developer's own port 3000 issue
+    # credentialed requests against production using their live session cookies.
+    if not Config.COOKIE_SECURE:
+        origins += [
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+            "http://0.0.0.0:3000",
+            "http://192.168.0.177:3000",
+        ]
+
+    # De-duplicate, preserving order (FRONTEND_URL may already be the www form).
+    return list(dict.fromkeys(origins))
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        Config.FRONTEND_URL, 
-        "http://localhost:3000", 
-        "http://127.0.0.1:3000",
-        "http://0.0.0.0:3000",
-        "http://192.168.0.177:3000"
-    ],
+    allow_origins=_cors_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
