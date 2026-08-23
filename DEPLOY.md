@@ -47,6 +47,11 @@ cannot collide with your other project. Only the loopback API port can.
 
 ## 2. Get the code onto the VPS
 
+> Deploying from a second computer, or want a dedicated `examloc` account rather than
+> your admin user? Do [`deploy/VPS-ACCESS.md`](deploy/VPS-ACCESS.md) first — it covers
+> the workstation SSH key, the `examloc` user, and the GitHub deploy key the VPS needs
+> to clone a private repo. It ends with the clone below already done.
+
 ```bash
 sudo mkdir -p /opt/examloc && sudo chown "$USER":"$USER" /opt/examloc
 git clone <your-repo-url> /opt/examloc && cd /opt/examloc
@@ -153,7 +158,16 @@ Tables are created automatically by `init_db()` on startup.
 Verify locally on the box before exposing it:
 
 ```bash
-curl -sI http://127.0.0.1:8100/docs | head -1     # expect: HTTP/1.1 200 OK
+# Docs live under the version prefix, not at /docs (src/__init__.py:45).
+curl -sI http://127.0.0.1:8100/api/v1/docs | head -1     # expect: HTTP/1.1 200 OK
+```
+
+A `404` here is not a crash — it means uvicorn is up and routing, you just asked for a
+path that doesn't exist. Confirm the app is genuinely healthy with:
+
+```bash
+docker compose -f docker-compose.prod.yml ps          # api should read (healthy)
+curl -s http://127.0.0.1:8100/api/v1/openapi.json | head -c 120
 ```
 
 ---
@@ -200,7 +214,7 @@ code changes are needed — the WebSocket URLs already derive `wss:` from
 
 ```bash
 # TLS + reachability
-curl -sI https://api.examloc.xyz/docs | head -1
+curl -sI https://api.examloc.xyz/api/v1/docs | head -1
 
 # CORS preflight must echo your Vercel origin
 curl -si -X OPTIONS https://api.examloc.xyz/api/v1/auth/login \
@@ -218,6 +232,39 @@ for p in 5432 5433 6379 9000 9001; do
     && echo "!! PORT $p IS PUBLICLY OPEN" || echo "ok: $p closed"
 done
 ```
+
+> **Expect 5432 and 6379 to report OPEN on this VPS — that is the *other* project, not
+> this one.** Its compose publishes `0.0.0.0:5432` (sps-postgres) and `0.0.0.0:6379`
+> (sps-redis). Nothing in `docker-compose.prod.yml` publishes either port, so this
+> stack is not the cause and changing it will not fix them. See the note below.
+> `9000`, `9001` and `5433` must all be closed — if any of those is open, that *is* ours.
+
+### The other project's exposed ports
+
+`sps-postgres` and `sps-redis` are reachable from the internet. Redis is the more
+serious of the two: if it has no `requirepass`, an unauthenticated attacker can read
+every key and often achieve RCE by rewriting the RDB path. Verify from a machine that
+is **not** the VPS:
+
+```bash
+redis-cli -h 2.24.95.77 ping        # PONG = wide open. NOAUTH = password set.
+nc -vz 2.24.95.77 5432             # succeeded = Postgres reachable
+```
+
+Note that `ufw` almost certainly does **not** protect these. Docker writes its own
+DNAT rules into the `nat` table, which are evaluated before ufw's filtering, so a
+published container port bypasses `ufw deny` entirely. The fix is to stop publishing
+them — in that project's compose, bind to loopback:
+
+```yaml
+ports:
+  - "127.0.0.1:5432:5432"     # was "5432:5432"
+  - "127.0.0.1:6379:6379"
+```
+
+Containers on the same Docker network reach each other by service name without any
+`ports:` entry at all, so this usually breaks nothing. Out of scope for this
+deployment, but worth doing the same day.
 
 Then in the browser: sign up, verify email, create an institution → subject → exam,
 add questions, pre-enroll a test student, send the enrollment link, register a face,
