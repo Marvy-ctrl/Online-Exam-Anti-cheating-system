@@ -92,7 +92,7 @@ npm run dev
 ```
 
 ---
-
+.
 ## ⚖️ Engineering Mindset
 
 Every component in this system is built with a **Zero Trust** model. We never trust client-side data. All timing, violation counts, and identity checks are authoritatively validated on the backend.
