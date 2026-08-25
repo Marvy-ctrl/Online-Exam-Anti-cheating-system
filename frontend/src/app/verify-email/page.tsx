@@ -46,7 +46,7 @@ function VerifyEmailContent() {
   const { status, message } = state
 
   return (
-    <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl p-10 text-center">
+    <div className="w-full max-w-md border border-slate-200 p-10 text-center">
       <div className="flex justify-center mb-6">
         <div className=" flex items-center justify-center">
             <Image 
@@ -69,7 +69,7 @@ function VerifyEmailContent() {
 
       {status === 'success' && (
         <>
-          <CheckCircle2 size={40} className="mx-auto text-green-500 mb-4" />
+          {/* <CheckCircle2 size={40} className="mx-auto text-green-500 mb-4" /> */}
           <h1 className="text-xl font-bold text-slate-900 mb-2">Email Verified!</h1>
           <p className="text-slate-500 text-sm mb-6">{message}</p>
           <Link

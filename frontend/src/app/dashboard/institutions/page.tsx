@@ -41,7 +41,7 @@ export default function InstitutionsPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-10 gap-4">
         <div>
           <h1 className="text-3xl font-bold text-slate-900 mb-2">Institutions</h1>
-          <p className="text-slate-500">Manage your deployed educational workspaces.</p>
+          <p className="text-slate-500">Manage your educational workspaces.</p>
         </div>
         <button 
           onClick={() => setIsModalOpen(true)}
@@ -74,7 +74,7 @@ export default function InstitutionsPage() {
             <Link 
               href={`/dashboard/institutions/${inst.uid}`} 
               key={inst.uid}
-              className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-300 transition-all group block relative"
+              className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-sm hover:border-blue-300 transition-all group block relative"
             >
               <div className="flex items-start justify-between mb-4">
                 <div className="w-12 h-12 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center overflow-hidden">

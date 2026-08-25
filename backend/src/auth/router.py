@@ -53,7 +53,7 @@ async def create_account(
         return JSONResponse(
             status_code=status.HTTP_200_OK,
             content={
-                "message": "A verification email has been resent. Please check your inbox."
+                "message": "A verification email has been sent. Please check your inbox."
             },
         )
 

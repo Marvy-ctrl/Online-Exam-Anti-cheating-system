@@ -68,7 +68,7 @@ export default function Dashboard() {
       
       {/* Overview Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+        <div className="bg-white p-6 border border-slate-200 shadow-sm hover:shadow-sm transition-shadow">
           <div className="flex justify-between items-start mb-4">
            
           </div>
@@ -78,7 +78,7 @@ export default function Dashboard() {
           <h3 className="font-medium text-slate-500 text-sm">Institutions</h3>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-sm transition-shadow">
          
           <p className="text-3xl text-slate-900 font-bold mb-1">
             {loading ? "..." : overview?.active_exams_count ?? 0}
@@ -86,7 +86,7 @@ export default function Dashboard() {
           <h3 className="font-medium text-slate-500 text-sm">Active Exams</h3>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-sm transition-shadow">
           <div className="flex justify-between items-start mb-4">
          
           </div>
@@ -96,7 +96,7 @@ export default function Dashboard() {
           <h3 className="font-medium text-slate-500 text-sm">Total Students</h3>
         </div>
         
-        <div className="bg-white p-6 rounded-2xl border border-red-100 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
+        <div className="bg-white p-6 rounded-2xl border border-red-100 shadow-sm hover:shadow-sm transition-shadow relative overflow-hidden">
           <div className="absolute top-0 right-0 w-20 h-20 bg-red-50 rounded-bl-full -mr-10 -mt-10 pointer-events-none"></div>
           <div className="flex justify-between items-start mb-4 relative z-10">
           

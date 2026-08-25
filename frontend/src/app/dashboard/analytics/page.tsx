@@ -88,27 +88,23 @@ export default function AnalyticsPage() {
         <StatCard 
           title="Institutions" 
           value={data?.overview.total_institutions ?? 0} 
-          icon={<Building2 size={20} />} 
-          color="blue"
+         
         />
         <StatCard 
           title="Total Exams" 
           value={data?.overview.total_exams ?? 0} 
-          icon={<BookCheck size={20} />} 
-          color="purple"
+         
         />
         <StatCard 
           title="Total Students" 
           value={data?.overview.total_students ?? 0} 
-          icon={<Users size={20} />} 
-          color="emerald"
+          
         />
         <StatCard 
           title="Security Violations" 
           value={data?.overview.total_violations ?? 0} 
-          icon={<TriangleAlert size={20} />} 
-          color="red"
           isAlert
+          showPing={false}
         />
       </div>
 
@@ -167,12 +163,13 @@ export default function AnalyticsPage() {
   );
 }
 
-function StatCard({ title, value, icon, color, isAlert = false }: { 
+function StatCard({ title, value, isAlert = false, showPing = true }: { 
   title: string, 
   value: number, 
-  icon: React.ReactNode, 
-  color: 'blue' | 'purple' | 'emerald' | 'red',
-  isAlert?: boolean
+  // icon: React.ReactNode, 
+  // color: 'blue' | 'purple' | 'emerald' | 'red',
+  isAlert?: boolean,
+  showPing?: boolean,
 }) {
   const colorClasses = {
     blue: 'bg-blue-50 text-blue-600',
@@ -182,27 +179,23 @@ function StatCard({ title, value, icon, color, isAlert = false }: {
   };
 
   return (
-    <div className={`bg-white p-6 rounded-2xl border ${isAlert ? 'border-red-100' : 'border-slate-200'} shadow-sm relative overflow-hidden group hover:shadow-md transition-all`}>
-      <div className="flex justify-between items-start mb-4">
-        <div className={`p-2.5 rounded-xl transition-colors ${colorClasses[color]}`}>
-          {icon}
-        </div>
-        {isAlert && value > 0 && (
+    <div className={`bg-white p-6 rounded-2xl border ${isAlert ? 'border-red-100' : 'border-slate-200'} shadow-sm relative overflow-hidden group hover:shadow-sm transition-all`}>
+      <div className="flex justify-between items-start">
+        <div className="w-10 h-10 rounded-xl transition-colors" />
+        {isAlert && value > 0 && showPing && (
           <span className="flex h-2 w-2 relative">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
           </span>
         )}
       </div>
-      <p className="text-3xl text-slate-900 font-bold mb-1 tracking-tight">
+      <p className="-mt-2 text-3xl text-slate-900 font-bold mb-1 tracking-tight">
         {value.toLocaleString()}
       </p>
       <h3 className="font-medium text-slate-500 text-sm">{title}</h3>
       
       {/* Decorative background element */}
-      <div className={`absolute -right-4 -bottom-4 w-20 h-20 opacity-[0.03] pointer-events-none group-hover:scale-110 transition-transform`}>
-        {icon}
-      </div>
+      {/* decorative background removed */}
     </div>
   );
 }

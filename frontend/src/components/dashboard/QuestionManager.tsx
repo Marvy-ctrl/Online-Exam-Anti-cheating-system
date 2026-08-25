@@ -243,32 +243,33 @@ export default function QuestionManager({ examUid }: QuestionManagerProps) {
   return (
     <div className="space-y-6">
       {/* Header Actions */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <h2 className="text-base md:text-xl font-bold text-slate-900 flex items-center gap-2">
           {/* <HelpCircle className="text-blue-600" /> */}
           Exam Questions ({questions.length})
         </h2>
-        <div className="flex gap-2">
-          {selectedUids.length > 0 && (
+        <div className="grid w-full grid-cols-2 gap-2 md:flex md:w-auto">
+          <button 
+            onClick={() => { setIsAdding(true); setIsBulkAdding(false); setIsEditing(false); }}
+            className="col-span-2 inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700 md:order-3 md:col-span-1 md:py-2"
+          >
+            <Plus size={16} /> Add Question
+          </button>
+            {selectedUids.length > 0 && (
             <button 
               onClick={handleBulkDelete}
-              className="px-4 py-2 text-red-600 font-medium rounded-xl hover:bg-red-100 transition-colors flex items-center gap-2 text-sm"
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-100 bg-red-50 px-3 py-2.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-100 md:order-2 md:border-0 md:bg-transparent md:px-4 md:py-2"
             >
-              <Trash2 size={16} /> Delete Selected ({selectedUids.length})
+              <Trash2 size={16} /> Delete ({selectedUids.length})
             </button>
           )}
           <button 
             onClick={() => { setIsBulkAdding(true); setIsAdding(false); setIsEditing(false); }}
-            className="px-4 py-2 bg-slate-100 text-slate-700 font-medium rounded-lg hover:bg-slate-200 transition-colors flex items-center gap-2 text-sm"
+            className={`inline-flex items-center justify-center gap-2 rounded-lg bg-slate-100 px-3 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-200 md:order-1 md:px-4 md:py-2 ${selectedUids.length === 0 ? 'col-span-2' : ''}`}
           >
             <FileUp size={16} /> Bulk JSON
           </button>
-          <button 
-            onClick={() => { setIsAdding(true); setIsBulkAdding(false); setIsEditing(false); }}
-            className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm shadow-sm"
-          >
-            <Plus size={16} /> Add Question
-          </button>
+        
         </div>
       </div>
 
@@ -483,7 +484,7 @@ export default function QuestionManager({ examUid }: QuestionManagerProps) {
                   </span>
                 </div>
               </div>
-              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                 <button 
                   onClick={() => handleEditClick(q)}
                   className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"

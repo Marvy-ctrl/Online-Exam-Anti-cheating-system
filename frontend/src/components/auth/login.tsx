@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import Link from 'next/link'
 // import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import {  Mail, Lock, AlertCircle } from 'lucide-react'
+import { AlertCircle } from 'lucide-react'
 import { apiFetch } from '@/src/lib/api'
 const loginSchema = z.object({
   email: z.email({ message: "Please enter a valid institution email" }),
@@ -68,9 +68,9 @@ export default function Loginform() {
           </div>
 
           {serverError && (
-            <div className="mb-6 p-4 rounded-lg bg-red-50 border border-red-200">
+            <div className="mb-6">
               <p className="text-sm text-red-600 flex items-center gap-2 font-medium">
-                <AlertCircle size={16} /> {serverError}
+                 {serverError}
               </p>
             </div>
           )}
@@ -80,14 +80,11 @@ export default function Loginform() {
               <label className="block text-xs font-bold text-slate-700  tracking-wider mb-2">
                   Enter your email address</label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail size={16} className={errors.email ? "text-red-400" : "text-slate-400"} />
-                </div>
                 <input
                   type="email"
                   placeholder="examiner@gmail.com"
                   {...register("email")}
-                  className={`w-full pl-10 pr-4 py-3 bg-slate-50 border rounded-lg text-sm transition-colors outline-none
+                  className={`w-full pl-3 pr-4 py-3 bg-slate-50 border rounded-lg text-sm transition-colors outline-none
                     ${errors.email 
                       ? "border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-500 bg-red-50/30" 
                       : "border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 hover:bg-slate-100"
@@ -96,7 +93,7 @@ export default function Loginform() {
               </div>
               {errors.email && (
                 <p className="mt-1.5 text-xs font-semibold text-red-500 flex items-center gap-1">
-                  <AlertCircle size={12} /> {errors.email.message}
+                   {errors.email.message}
                 </p>
               )}
             </div>
@@ -111,14 +108,11 @@ export default function Loginform() {
                 </Link>
               </div>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock size={16} className={errors.password ? "text-red-400" : "text-slate-400"} />
-                </div>
                 <input
                   type="password"
                   placeholder="••••••••"
                   {...register("password")}
-                  className={`w-full pl-10 pr-4 py-3 bg-slate-50 border rounded-lg text-sm transition-colors outline-none
+                  className={`w-full pl-3 pr-4 py-3 bg-slate-50 border rounded-lg text-sm transition-colors outline-none
                     ${errors.password 
                       ? "border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-500 bg-red-50/30" 
                       : "border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 hover:bg-slate-100"
@@ -127,7 +121,7 @@ export default function Loginform() {
               </div>
               {errors.password && (
                 <p className="mt-1.5 text-xs font-semibold text-red-500 flex items-center gap-1">
-                  <AlertCircle size={12} /> {errors.password.message}
+                  {errors.password.message}
                 </p>
               )}
             </div>

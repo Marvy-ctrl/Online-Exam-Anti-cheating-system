@@ -116,9 +116,9 @@ def send_password_reset_email(to_email: str, token: str) -> None:
     <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #1a1a2e;">
         <h2>Reset Your Password</h2>
         <p>You requested a password reset. Click the button below to set a new password.</p>
-        <a href="{reset_url}"
-           style="display: inline-block; padding: 12px 24px; background-color: 2563EB;
-                  color: white; text-decoration: none; border-radius: 6px; margin: 16px 0;">
+          <a href="{reset_url}"
+              style="display: inline-block; padding: 12px 24px; background-color: #2563EB;
+                        color: white; text-decoration: none; border-radius: 6px; margin: 16px 0;">
             Reset Password
         </a>
         <p style="color: #666; font-size: 14px;">This link expires in <strong>1 hour</strong>.</p>

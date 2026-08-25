@@ -577,98 +577,110 @@ export default function ExamDetailWorkspace() {
   }
 
   return (
-    <div className="p-8 max-w-7xl mx-auto w-full animate-in fade-in duration-500">
+    <div className="p-4 sm:p-8 max-w-7xl mx-auto w-full animate-in fade-in duration-500">
       
       {/* Breadcrumbs */}
-      <div className="flex items-center gap-2 text-sm text-slate-500 mb-6 font-medium">
+      <div className="flex items-center gap-2 text-sm text-slate-500 mb-5 sm:mb-6 font-medium min-w-0">
         <Link href="/dashboard/institutions" className="hover:text-blue-600 transition-colors">Institutions</Link>
         <ChevronRight size={14} />
-        <Link href={`/dashboard/institutions/${id}`} className="hover:text-blue-600 transition-colors">Workspace</Link>
+        <Link href={`/dashboard/institutions/${id}`} className="hover:text-blue-600 transition-colors truncate">Workspace</Link>
         <ChevronRight size={14} />
-        <span className="text-slate-900 truncate max-w-[200px]">{exam.title}</span>
+        <span className="text-slate-900 truncate max-w-[96px] sm:max-w-[200px]">{exam.title}</span>
       </div>
 
       {/* Header Context */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm mb-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-        <div>
-          <div className="flex items-center gap-3 mb-2">
+      <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-xs mb-6 sm:mb-8 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5 sm:gap-6">
+        <div className="w-full min-w-0">
+          <div className="flex items-start gap-3 mb-3">
             <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
               <FileText size={20} />
             </div>
-            <h1 className="text-2xl font-bold text-slate-900">{exam.title}</h1>
-            <span className={`px-2.5 py-1 text-xs font-bold uppercase tracking-wider rounded-md border ${getExamStatus(exam).cls}`}>
-              {getExamStatus(exam).label}
-            </span>
-            {wsConnected && getExamStatus(exam).label === 'Active' && (
-              <div className="flex items-center gap-2 px-2 py-1 bg-green-50 border border-green-100 rounded-md">
-                <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-                <span className="text-[10px] font-black text-green-700 uppercase tracking-widest">Live Monitoring Active</span>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-xl sm:text-2xl font-bold text-slate-900 break-words">{exam.title}</h1>
+                <span className={`px-2.5 py-1 text-xs font-bold uppercase tracking-wider rounded-md border ${getExamStatus(exam).cls}`}>
+                  {getExamStatus(exam).label}
+                </span>
               </div>
-            )}
+              {wsConnected && getExamStatus(exam).label === 'Active' && (
+                <div className="mt-2 flex w-fit items-center gap-2 px-2 py-1 bg-green-50 border border-green-100 rounded-md">
+                  <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+                  <span className="text-[10px] font-black text-green-700 uppercase tracking-widest">Live Monitoring Active</span>
+                </div>
+              )}
+            </div>
           </div>
-          <p className="text-slate-500 text-sm ml-13 flex items-center gap-2">
-            <span className="font-medium text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
+          <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500 sm:ml-[52px]">
+            <span className="max-w-full truncate font-medium text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
               {exam.subject_name || "No Subject Assigned"}
             </span>
-            <span className="text-slate-300">•</span>
             <span className="font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded text-xs">
               {exam_uid.split('-')[0]}
             </span>
-            <span className="text-slate-300">•</span>
             <span>{exam.duration_minutes} Minutes</span>
-          </p>
+          </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:gap-3">
           <button 
             onClick={handleDeleteExam}
-            className="px-4 py-2 bg-white text-red-600 font-medium rounded-lg border border-slate-200 hover:bg-red-50 hover:border-red-200 transition-colors flex items-center gap-2"
+            className="px-4 py-2 bg-white text-red-600 font-medium rounded-lg border border-slate-200 hover:bg-red-50 hover:border-red-200 transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
           >
             <Trash2 size={16}/> Delete Exam
           </button>
           
           <Link 
             href={`/dashboard/institutions/${id}/exams/${exam_uid}/pre-enroll`}
-            className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm shadow-blue-600/20"
+            className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 shadow-sm shadow-blue-600/20 whitespace-nowrap"
           >
             <Users size={16}/> Bulk Pre-Enroll
           </Link>
         </div>
       </div>
 
-      {/* Modern Tab Navigation */}
-      <div className="flex items-center gap-6 border-b border-slate-200 mb-8 px-2">
-        <button 
+      {/* Exam navigation */}
+      <div className="flex items-center gap-4 overflow-x-auto border-b border-slate-200 mb-6 sm:mb-8 px-2 [-webkit-overflow-scrolling:touch]">
+        <button
           onClick={() => setActiveTab('overview')}
-          className={`pb-4 flex items-center gap-2 font-medium text-sm transition-colors relative ${activeTab === 'overview' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-900'}`}
+          aria-label="Overview"
+          title="Overview"
+          className={`shrink-0 whitespace-nowrap pb-4 flex items-center gap-2 font-medium text-xs sm:text-sm transition-colors relative ${activeTab === 'overview' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-900'}`}
         >
           <FileText size={16} /> Overview
           {activeTab === 'overview' && <span className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 rounded-t-full"></span>}
         </button>
-        <button 
+        <button
           onClick={() => setActiveTab('enrolled')}
-          className={`pb-4 flex items-center gap-2 font-medium text-sm transition-colors relative ${activeTab === 'enrolled' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-900'}`}
+          aria-label="Enrolled Students"
+          title="Enrolled Students"
+          className={`shrink-0 whitespace-nowrap pb-4 flex items-center gap-2 font-medium text-xs sm:text-sm transition-colors relative ${activeTab === 'enrolled' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-900'}`}
         >
           <Users size={16} /> Enrolled Students
           {activeTab === 'enrolled' && <span className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 rounded-t-full"></span>}
         </button>
-        <button 
+        <button
           onClick={() => setActiveTab('questions')}
-          className={`pb-4 flex items-center gap-2 font-medium text-sm transition-colors relative ${activeTab === 'questions' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-900'}`}
+          aria-label="Questions"
+          title="Questions"
+          className={`shrink-0 whitespace-nowrap pb-4 flex items-center gap-2 font-medium text-xs sm:text-sm transition-colors relative ${activeTab === 'questions' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-900'}`}
         >
           <HelpCircle size={16} /> Questions
           {activeTab === 'questions' && <span className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 rounded-t-full"></span>}
         </button>
-        <button 
+        <button
           onClick={() => setActiveTab('results')}
-          className={`pb-4 flex items-center gap-2 font-medium text-sm transition-colors relative ${activeTab === 'results' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-900'}`}
+          aria-label="Results and Grading"
+          title="Results and Grading"
+          className={`shrink-0 whitespace-nowrap pb-4 flex items-center gap-2 font-medium text-xs sm:text-sm transition-colors relative ${activeTab === 'results' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-900'}`}
         >
           <CheckCircle size={16} /> Results & Grading
           {activeTab === 'results' && <span className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 rounded-t-full"></span>}
         </button>
-        <button 
+        <button
           onClick={() => setActiveTab('settings')}
-          className={`pb-4 flex items-center gap-2 font-medium text-sm transition-colors relative ${activeTab === 'settings' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-900'}`}
+          aria-label="Configuration"
+          title="Configuration"
+          className={`shrink-0 whitespace-nowrap pb-4 flex items-center gap-2 font-medium text-xs sm:text-sm transition-colors relative ${activeTab === 'settings' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-900'}`}
         >
           <Cog size={16} /> Configuration
           {activeTab === 'settings' && <span className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 rounded-t-full"></span>}
@@ -676,7 +688,7 @@ export default function ExamDetailWorkspace() {
       </div>
 
       {/* Tab Context Container */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-8 min-h-[400px]">
+      <div className="bg-white shadow-xs rounded-2xl border border-slate-200 p-4 sm:p-8 min-h-[400px]">
         {activeTab === 'overview' && (
           <div className="space-y-8">
             <div>
@@ -718,7 +730,7 @@ export default function ExamDetailWorkspace() {
                   </p>
                   <button 
                     onClick={() => setIsEditingLink(true)}
-                    className="px-6 py-2.5 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20"
+                    className="px-6 py-2.5 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all shadow-sm shadow-blue-600/20"
                   >
                     Setup Enrollment Link
                   </button>
@@ -773,9 +785,7 @@ export default function ExamDetailWorkspace() {
                            >
                              Update Window
                            </button>
-                           <div className="flex items-center gap-1.5 text-xs text-green-600 font-bold px-2 py-0.5 bg-green-50 border border-green-100 rounded-md">
-                            Active
-                           </div>
+                           
                         </div>
                       </div>
                       
@@ -849,7 +859,7 @@ export default function ExamDetailWorkspace() {
                   </div>
 
                   {/* Invitation Tool */}
-                  <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+                  <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm">
                     <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
                       Send Email Invitations
                     </h3>
@@ -879,7 +889,6 @@ export default function ExamDetailWorkspace() {
                           </>
                         ) : sendSuccess ? (
                           <>
-                            <CheckCircle size={18} />
                             Invitations Sent!
                           </>
                         ) : (
@@ -890,12 +899,12 @@ export default function ExamDetailWorkspace() {
                       </button>
                       {students.filter(s => s.status !== 'enrolled').length === 0 && students.length > 0 && (
                         <p className="text-center text-[11px] text-green-500 mt-2 font-medium">
-                          ✓ All students have successfully enrolled. No emails to send.
+                           All students have successfully enrolled. No emails to send.
                         </p>
                       )}
                       {students.length === 0 && (
                         <p className="text-center text-[11px] text-red-500 mt-2 font-medium">
-                          ⚠️ You must add students first before sending invitations.
+                           You must add students first before sending invitations.
                         </p>
                       )}
                     </div>
@@ -910,7 +919,7 @@ export default function ExamDetailWorkspace() {
                 {/* <ShieldCheck size={20} className="text-green-600" /> */}
                 Exam Entry Link
               </h2>
-              <p className="text-sm text-slate-500 mb-4">
+              <p className="text-xs md:text-sm text-slate-500 mb-4">
                 Generate a secure exam link and send it to all fully enrolled students on exam day.
                 The link is only valid during the exam window ({new Date(exam.start_time).toLocaleString()} → {new Date(exam.end_time).toLocaleString()}).
               </p>
@@ -965,7 +974,7 @@ export default function ExamDetailWorkspace() {
                       Send to Enrolled Students
                     </h3>
                     <p className="text-xs text-slate-500 mb-4">
-                      Emails the exam link to all <strong>{students.filter(s => s.status === 'enrolled').length}</strong> fully enrolled students.
+                      Send the exam link to all <strong>{students.filter(s => s.status === 'enrolled').length}</strong> fully enrolled students.
                     </p>
                     <button
                       onClick={handleSendExamLink}
@@ -1008,7 +1017,7 @@ export default function ExamDetailWorkspace() {
                     className="flex items-center gap-1.5 px-3 py-1.5 text-red-600 font-bold text-xs  hover:bg-red-100 transition-colors disabled:opacity-50"
                   >
                     {isBulkDeleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
-                    Delete Selected ({selectedStudentUids.size})
+                    Delete ({selectedStudentUids.size})
                   </button>
                 )}
               </div>
@@ -1071,7 +1080,7 @@ export default function ExamDetailWorkspace() {
                           )}
                         </td>
                         <td className="py-3 px-4 text-right">
-                          <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="flex items-center justify-end gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                             <button 
                               onClick={() => handleEditStudent(stu)}
                               className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
@@ -1132,10 +1141,10 @@ export default function ExamDetailWorkspace() {
                </div>
              ) : (
                <div className="overflow-x-auto rounded-xl border border-slate-200">
-                  <table className="w-full text-left border-collapse">
+                  <table className="min-w-[760px] w-full table-fixed sm:table-auto text-left border-collapse">
                     <thead>
                       <tr className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                        <th className="py-3 px-4 w-10">
+                        <th className="hidden sm:table-cell py-3 px-4 w-10">
                           <input 
                             type="checkbox" 
                             checked={selectedSessionUids.size === results.length && results.length > 0} 
@@ -1143,17 +1152,17 @@ export default function ExamDetailWorkspace() {
                             className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                           />
                         </th>
-                        <th className="py-3 px-4">Student</th>
-                        <th className="py-3 px-4">Score</th>
-                        <th className="py-3 px-4">Violations</th>
-                        <th className="py-3 px-4">Status</th>
-                        <th className="py-3 px-4 text-right">Actions</th>
+                        <th className="w-[24%] sm:w-auto py-3 px-2 sm:px-4">Student</th>
+                        <th className="w-[14%] sm:w-auto py-3 px-2 sm:px-4">Score</th>
+                        <th className="w-[21%] sm:w-auto py-3 px-2 sm:px-4"><span className="sm:hidden">Alerts</span><span className="hidden sm:inline">Violations</span></th>
+                        <th className="w-[17%] sm:w-auto py-3 px-2 sm:px-4">Status</th>
+                        <th className="w-[24%] sm:w-auto py-3 px-2 sm:px-4 text-center sm:text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-sm">
                       {results.map((res) => (
-                        <tr key={res.session_uid} className="hover:bg-slate-50/50 transition-colors group">
-                           <td className="py-3 px-4">
+                        <tr key={res.session_uid} className="hover:bg-slate-50/50 transition-colors group align-top">
+                           <td className="hidden sm:table-cell py-3 px-4">
                              <input 
                                type="checkbox" 
                                checked={selectedSessionUids.has(res.session_uid)} 
@@ -1161,45 +1170,47 @@ export default function ExamDetailWorkspace() {
                                className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                              />
                            </td>
-                           <td className="py-3 px-4">
+                           <td className="py-3 px-2 sm:px-4">
                               <Link 
                                 href={`/dashboard/institutions/${id}/exams/${exam_uid}/audit/${res.session_uid}`}
                                 className="text-left group/name block"
                               >
-                                <div className="font-medium text-slate-900 group-hover/name:text-blue-600 transition-colors flex items-center gap-1.5">
+                                <div className="truncate text-xs sm:text-sm font-medium text-slate-900 group-hover/name:text-blue-600 transition-colors flex items-center gap-1.5">
                                   {res.student_name}
                                   <ExternalLink size={12} className="opacity-0 group-hover/name:opacity-100 transition-opacity" />
                                 </div>
-                                <div className="text-xs text-slate-400 font-mono">{res.student_id}</div>
+                                <div className="hidden sm:block text-xs text-slate-400 font-mono">{res.student_id}</div>
                               </Link>
                            </td>
-                           <td className="py-3 px-4 font-bold text-slate-700">
+                           <td className="py-3 px-2 sm:px-4 text-xs sm:text-sm font-bold text-slate-700 whitespace-nowrap">
                              {res.score !== null ? `${res.score} / ${res.total_marks || 0}` : '--'}
                            </td>
-                           <td className="py-3 px-4">
+                           <td className="py-3 px-2 sm:px-4">
                               {res.violation_count > 0 ? (
                                 <div className="space-y-1">
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-50 text-red-600 border border-red-100 rounded text-xs font-bold">
-                                    <AlertCircle size={10} /> {res.violation_count} Violations
+                                  <span className="inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 bg-red-50 text-red-600 border border-red-100 rounded text-[10px] sm:text-xs font-bold">
+                                    <AlertCircle size={10} /> {res.violation_count}<span className="hidden sm:inline"> Violations</span>
                                   </span>
                                   {res.violation_summary && res.violation_summary !== 'None' && (
-                                    <p className="text-[10px] text-slate-500 font-medium leading-tight">
+                                    <p className="hidden sm:block text-[10px] text-slate-500 font-medium leading-tight">
                                       {res.violation_summary}
                                     </p>
                                   )}
                                 </div>
                               ) : (
-                                <span className="text-slate-400 text-xs">No violations</span>
+                                <span className="text-slate-400 text-[10px] sm:text-xs"><span className="sm:hidden">None</span><span className="hidden sm:inline">No violations</span></span>
                               )}
                            </td>
-                           <td className="py-3 px-4">
-                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                           <td className="py-3 px-2 sm:px-4">
+                              <span className={`inline-block max-w-full truncate px-1.5 sm:px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-bold uppercase ${
                                 res.status === 'Submitted' ? 'bg-green-50 text-green-600 border border-green-100' : 'bg-blue-50 text-blue-600 border border-blue-100'
                               }`}>
-                                {res.status}
+                                <span className="sm:hidden">{res.status === 'Submitted' ? 'Done' : res.status}</span>
+                                <span className="hidden sm:inline">{res.status}</span>
                               </span>
                            </td>
-                           <td className="py-3 px-4 text-right">
+                           <td className="py-3 px-2 sm:px-4 text-center sm:text-right">
+                             <div className="flex items-center justify-end gap-2 flex-wrap">
                               <button 
                                 onClick={() => {
                                   setSelectedSession(res)
@@ -1207,16 +1218,17 @@ export default function ExamDetailWorkspace() {
                                   setAdjReason(res.adjustment_reason || "")
                                   setShowScoreModal(true)
                                 }}
-                                className="px-3 py-1 bg-white border border-slate-200 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-50 hover:border-blue-300 transition-all"
+                                className="px-1.5 sm:px-3 py-1 bg-white border border-slate-200 text-slate-600 rounded-lg text-[10px] sm:text-xs font-bold hover:bg-slate-50 hover:border-blue-300 transition-all"
                               >
                                 Edit Score
                               </button>
                               <button
                                 onClick={() => handleOpenSingleRelease(res.session_uid, res.student_name)}
-                                className="ml-2 px-3 py-1 bg-white border border-slate-200 text-slate-600 rounded-lg text-xs hover:bg-slate-50 hover:border-blue-300 font-bold transition-all inline-flex items-center gap-1 shadow-sm shadow-blue-600/10"
+                                className="px-1.5 sm:px-3 py-1 bg-white border border-slate-200 text-slate-600 rounded-lg text-[10px] sm:text-xs hover:bg-slate-50 hover:border-blue-300 font-bold transition-all inline-flex items-center justify-center gap-1 shadow-sm shadow-blue-600/10"
                               >
                                  Send Result
                               </button>
+                             </div>
                            </td>
                         </tr>
                       ))}
@@ -1258,7 +1270,7 @@ export default function ExamDetailWorkspace() {
                     className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all min-h-[100px] resize-y"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Duration (Mins)</label>
                     <input
@@ -1271,7 +1283,7 @@ export default function ExamDetailWorkspace() {
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Start Time</label>
                     <DateTimePicker date={editStartTime} setDate={setEditStartTime} />

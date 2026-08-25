@@ -4,7 +4,7 @@ import { z } from "zod"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import Link from 'next/link'
-import { User, Mail, Lock, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { CheckCircle2 } from 'lucide-react'
 import { apiFetch } from '@/src/lib/api'
 const signupSchema = z.object({
   first_name: z.string().min(2, { message: "First name is required" }),
@@ -81,17 +81,14 @@ export default function SignupForm() {
           </div>
 
           {serverError && (
-            <div className="mb-6 p-4 rounded-lg bg-red-50 border border-red-200">
-              <p className="text-sm text-red-600 flex items-center gap-2 font-medium">
-                <AlertCircle size={16} /> {serverError}
-              </p>
+            <div className="mb-6">
+              <p className="text-sm text-red-600 font-medium">{serverError}</p>
             </div>
           )}
 
           {successMsg && (
-            <div className="mb-6 p-4 rounded-lg bg-green-50 border border-green-200">
+            <div className="mb-6">
               <p className="text-sm text-green-700 flex items-start gap-2 font-medium">
-                <CheckCircle2 size={18} className="shrink-0 mt-0.5" /> 
                 {successMsg}
               </p>
             </div>
@@ -106,24 +103,19 @@ export default function SignupForm() {
                   First Name
                 </label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <User size={16} className={errors.first_name ? "text-red-400" : "text-slate-400"} />
-                  </div>
-                  <input
-                    type="text"
-                    placeholder="Marvel"
-                    {...register("first_name")}
-                    className={`w-full pl-10 pr-4 py-3 bg-slate-50 border rounded-lg text-sm transition-colors outline-none
-                      ${errors.first_name 
-                        ? "border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-500 bg-red-50/30" 
-                        : "border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 hover:bg-slate-100"
-                      }`}
-                  />
+                    <input
+                      type="text"
+                      placeholder="Marvel"
+                      {...register("first_name")}
+                      className={`w-full pl-3 pr-4 py-3 bg-slate-50 border rounded-lg text-sm transition-colors outline-none
+                        ${errors.first_name 
+                          ? "border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-500 bg-red-50/30" 
+                          : "border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 hover:bg-slate-100"
+                        }`}
+                    />
                 </div>
                 {errors.first_name && (
-                  <p className="mt-1.5 text-xs font-semibold text-red-500 flex items-center gap-1">
-                    <AlertCircle size={12} /> {errors.first_name.message}
-                  </p>
+                  <p className="mt-1.5 text-xs font-semibold text-red-500">{errors.first_name.message}</p>
                 )}
               </div>
 
@@ -132,14 +124,11 @@ export default function SignupForm() {
                   Last Name
                 </label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <User size={16} className={errors.last_name ? "text-red-400" : "text-slate-400"} />
-                  </div>
                   <input
                     type="text"
                     placeholder="Sam"
                     {...register("last_name")}
-                    className={`w-full pl-10 pr-4 py-3 bg-slate-50 border rounded-lg text-sm transition-colors outline-none
+                    className={`w-full pl-3 pr-4 py-3 bg-slate-50 border rounded-lg text-sm transition-colors outline-none
                       ${errors.last_name 
                         ? "border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-500 bg-red-50/30" 
                         : "border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 hover:bg-slate-100"
@@ -147,9 +136,7 @@ export default function SignupForm() {
                   />
                 </div>
                 {errors.last_name && (
-                  <p className="mt-1.5 text-xs font-semibold text-red-500 flex items-center gap-1">
-                    <AlertCircle size={12} /> {errors.last_name.message}
-                  </p>
+                  <p className="mt-1.5 text-xs font-semibold text-red-500">{errors.last_name.message}</p>
                 )}
               </div>
             </div>
@@ -159,14 +146,11 @@ export default function SignupForm() {
                 Enter your email address
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail size={16} className={errors.email ? "text-red-400" : "text-slate-400"} />
-                </div>
                 <input
                   type="email"
                   placeholder="examiner@gmail.com"
                   {...register("email")}
-                  className={`w-full pl-10 pr-4 py-3 bg-slate-50 border rounded-lg text-sm transition-colors outline-none
+                  className={`w-full pl-3 pr-4 py-3 bg-slate-50 border rounded-lg text-sm transition-colors outline-none
                     ${errors.email 
                       ? "border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-500 bg-red-50/30" 
                       : "border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 hover:bg-slate-100"
@@ -174,9 +158,7 @@ export default function SignupForm() {
                 />
               </div>
               {errors.email && (
-                <p className="mt-1.5 text-xs font-semibold text-red-500 flex items-center gap-1">
-                  <AlertCircle size={12} /> {errors.email.message}
-                </p>
+                <p className="mt-1.5 text-xs font-semibold text-red-500">{errors.email.message}</p>
               )}
             </div>
 
@@ -185,14 +167,11 @@ export default function SignupForm() {
                 Password
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock size={16} className={errors.password ? "text-red-400" : "text-slate-400"} />
-                </div>
                 <input
                   type="password"
                   placeholder="••••••••"
                   {...register("password")}
-                  className={`w-full pl-10 pr-4 py-3 bg-slate-50 border rounded-lg text-sm transition-colors outline-none
+                  className={`w-full pl-3 pr-4 py-3 bg-slate-50 border rounded-lg text-sm transition-colors outline-none
                     ${errors.password 
                       ? "border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-500 bg-red-50/30" 
                       : "border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 hover:bg-slate-100"
@@ -200,9 +179,7 @@ export default function SignupForm() {
                 />
               </div>
               {errors.password && (
-                <p className="mt-1.5 text-xs font-semibold text-red-500 flex items-center gap-1">
-                  <AlertCircle size={12} /> {errors.password.message}
-                </p>
+                <p className="mt-1.5 text-xs font-semibold text-red-500">{errors.password.message}</p>
               )}
             </div>
 

@@ -215,18 +215,18 @@ export default function InstitutionWorkspace() {
   }
 
   return (
-    <div className="p-8 max-w-7xl mx-auto w-full">
+    <div className="w-full max-w-7xl mx-auto p-4 sm:p-8">
       {/* Breadcrumbs & Header */}
       <div className="mb-8">
-        <div className="flex items-center gap-2 text-sm text-slate-500 mb-4 font-medium">
+        <div className="flex items-center gap-2 text-sm text-slate-500 mb-4 font-medium min-w-0">
           <Link href="/dashboard/institutions" className="hover:text-blue-600 transition-colors">Institutions</Link>
           <ChevronRight size={14} />
-          <span className="text-slate-900">{institution.name} Workspace</span>
+          <span className="text-slate-900 truncate">{institution.name} Workspace</span>
         </div>
         
-        <div className="flex items-center justify-between bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center overflow-hidden">
+        <div className="flex flex-col gap-5 bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-xs lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 shrink-0 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center overflow-hidden">
                {institution.logo_url ? (
                    <img
                      src={institution.logo_url}
@@ -237,12 +237,12 @@ export default function InstitutionWorkspace() {
                    <Building2 size={24} className="text-blue-500" />
                )}
             </div>
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900">{institution.name}</h1>
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl font-bold text-slate-900 truncate">{institution.name}</h1>
               <p className="text-slate-500 text-sm">Institution Workspace</p>
             </div>
           </div>
-          <div className="flex gap-3 text-sm">
+          <div className="grid grid-cols-2 gap-2 text-sm sm:flex sm:gap-3">
             <button 
               onClick={async () => {
                 if (window.confirm("Are you sure you want to delete this workspace? This action cannot be undone and will delete all associated subjects and exams.")) {
@@ -259,20 +259,20 @@ export default function InstitutionWorkspace() {
                   }
                 }
               }}
-              className="px-4 py-2 text-red-600 font-medium transition-colors flex items-center gap-2"
+              className="col-span-2 sm:col-auto px-4 py-2 text-red-600 font-medium transition-colors flex items-center justify-center gap-2"
               title="Delete Workspace"
             >
               <Trash2 size={16}/> Delete
             </button>
             <button 
               onClick={() => setIsSubjectModalOpen(true)}
-              className="px-4 py-2 bg-white border border-slate-200 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors flex items-center gap-2"
+              className="px-3 sm:px-4 py-2 bg-white border border-slate-200 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
             >
                New Subject
             </button>
             <button 
               onClick={() => setIsExamModalOpen(true)}
-              className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+              className="px-3 sm:px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
             >
               <Plus size={16}/> Create Exam
             </button>
@@ -280,32 +280,40 @@ export default function InstitutionWorkspace() {
         </div>
       </div>
 
-      {/* Modern Tab Navigation */}
-      <div className="flex items-center gap-6 border-b border-slate-200 mb-8 px-2">
+      {/* Workspace navigation */}
+      <div className="flex items-center gap-4 overflow-x-auto border-b border-slate-200 mb-6 sm:mb-8 px-2 [-webkit-overflow-scrolling:touch]">
         <button 
           onClick={() => setActiveTab('exams')}
-          className={`pb-4 flex items-center gap-2 font-medium text-sm transition-colors relative ${activeTab === 'exams' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-900'}`}
+          aria-label="Exams"
+          title="Exams"
+          className={`shrink-0 whitespace-nowrap pb-4 flex items-center gap-2 font-medium text-xs sm:text-sm transition-colors relative ${activeTab === 'exams' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-900'}`}
         >
           <FileText size={16} /> Exams
           {activeTab === 'exams' && <span className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 rounded-t-full"></span>}
         </button>
         <button 
           onClick={() => setActiveTab('students')}
-          className={`pb-4 flex items-center gap-2 font-medium text-sm transition-colors relative ${activeTab === 'students' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-900'}`}
+          aria-label="Enrolled students"
+          title="Enrolled students"
+          className={`shrink-0 whitespace-nowrap pb-4 flex items-center gap-2 font-medium text-xs sm:text-sm transition-colors relative ${activeTab === 'students' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-900'}`}
         >
           <Users size={16} /> Enrolled
           {activeTab === 'students' && <span className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 rounded-t-full"></span>}
         </button>
         <button 
           onClick={() => setActiveTab('subjects')}
-          className={`pb-4 flex items-center gap-2 font-medium text-sm transition-colors relative ${activeTab === 'subjects' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-900'}`}
+          aria-label="Subjects"
+          title="Subjects"
+          className={`shrink-0 whitespace-nowrap pb-4 flex items-center gap-2 font-medium text-xs sm:text-sm transition-colors relative ${activeTab === 'subjects' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-900'}`}
         >
           <BookOpen size={16} /> Subjects
           {activeTab === 'subjects' && <span className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 rounded-t-full"></span>}
         </button>
         <button 
           onClick={() => setActiveTab('analytics')}
-          className={`pb-4 flex items-center gap-2 font-medium text-sm transition-colors relative ${activeTab === 'analytics' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-900'}`}
+          aria-label="Analytics"
+          title="Analytics"
+          className={`shrink-0 whitespace-nowrap pb-4 flex items-center gap-2 font-medium text-xs sm:text-sm transition-colors relative ${activeTab === 'analytics' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-900'}`}
         >
           <BarChart3 size={16} /> Analytics
           {activeTab === 'analytics' && <span className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 rounded-t-full"></span>}
@@ -313,7 +321,7 @@ export default function InstitutionWorkspace() {
       </div>
 
       {/* Tab Content Areas */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-8 min-h-[400px]">
+      <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-8 min-h-[400px]">
         {activeTab === 'exams' && (
           <div>
             <h2 className="text-lg font-bold text-slate-900 mb-4">Active Exams</h2>
@@ -325,7 +333,7 @@ export default function InstitutionWorkspace() {
                   <Link 
                     key={exam.uid} 
                     href={`/dashboard/institutions/${id}/exams/${exam.uid}`}
-                    className="group flex flex-col p-5 border border-slate-200 rounded-xl hover:border-blue-300 hover:shadow-md transition-all bg-white"
+                    className="group flex flex-col p-4 sm:p-5 border border-slate-200 rounded-xl hover:border-blue-300 hover:shadow-md transition-all bg-white"
                   >
                     <div className="flex justify-between items-start mb-4">
                       <div>
@@ -341,7 +349,7 @@ export default function InstitutionWorkspace() {
                       <span className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-md border ${getExamStatus(exam).cls}`}>
                         {getExamStatus(exam).label}
                       </span>
-                      <span className="text-sm font-medium text-blue-600 opacity-0 (-translate-x-2) group-hover:opacity-100 group-hover:translate-x-0 transition-all">
+                    <span className="text-sm font-medium text-blue-600 sm:opacity-0 sm:-translate-x-2 sm:group-hover:opacity-100 sm:group-hover:translate-x-0 transition-all">
                         Manage Exam
                       </span>
                     </div>
@@ -410,7 +418,7 @@ export default function InstitutionWorkspace() {
                     <tr className="border-b border-slate-200 text-sm font-semibold text-slate-500 uppercase tracking-wider">
                       <th className="py-3 px-4">Student</th>
                       <th className="py-3 px-4">Email</th>
-                      <th className="py-3 px-4">ID / Reg No.</th>
+                      <th className="py-3 px-4">Reg No</th>
                       <th className="py-3 px-4 text-center">Status</th>
                       <th className="py-3 px-4 text-right">Actions</th>
                     </tr>
@@ -424,15 +432,16 @@ export default function InstitutionWorkspace() {
                         <td className="py-3 px-4 text-sm text-slate-500">{stu.email}</td>
                         <td className="py-3 px-4 text-sm font-mono text-slate-600">{stu.student_id}</td>
                         <td className="py-3 px-4 text-center">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
+                          <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium text-slate-700">
                             Pre-Enrolled
                           </span>
                         </td>
                         <td className="py-3 px-4 text-right">
-                          <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="flex items-center justify-end gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                             <button 
                               onClick={() => handleEditStudent(stu)}
-                              className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                              className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md
+                               opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity "
                               title="Edit Global Profile"
                             >
                               <Edit2 size={16} />

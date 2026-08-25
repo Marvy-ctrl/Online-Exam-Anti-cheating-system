@@ -65,9 +65,9 @@ function ResetPasswordForm() {
   if (!token) {
     return (
       <div className="text-center">
-        <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+        {/* <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
           <AlertCircle size={32} />
-        </div>
+        </div> */}
         <h2 className="text-xl font-bold text-slate-900 mb-2">Invalid Link</h2>
         <p className="text-slate-500 mb-6">No reset token provided in the URL.</p>
         <Link href="/forget-password" className="text-blue-600 font-semibold hover:text-blue-700">
@@ -80,9 +80,9 @@ function ResetPasswordForm() {
   if (status === 'success') {
     return (
       <div className="text-center">
-        <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
+        {/* <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
           <CheckCircle2 size={32} />
-        </div>
+        </div> */}
         <h2 className="text-xl font-bold text-slate-900 mb-2">Success</h2>
         <p className="text-slate-700 font-medium mb-6">{message}</p>
         <button 
@@ -104,8 +104,8 @@ function ResetPasswordForm() {
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {status === 'error' && (
-          <div className="p-4 rounded-lg bg-red-50 text-red-600 flex items-start gap-3 text-sm">
-            <AlertCircle size={18} className="shrink-0 mt-0.5" />
+          <div className="p-4 text-red-600 flex items-start gap-3 text-sm">
+            {/* <AlertCircle size={18} className="shrink-0 mt-0.5" /> */}
             <p>{message}</p>
           </div>
         )}
@@ -113,16 +113,14 @@ function ResetPasswordForm() {
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1.5">New Password</label>
           <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Lock size={18} className="text-slate-400" />
-            </div>
+           
             <input
               type="password"
               required
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               placeholder="••••••••"
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm transition-colors outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              className="w-full pl-3 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm transition-colors outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             />
           </div>
         </div>
@@ -130,16 +128,14 @@ function ResetPasswordForm() {
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1.5">Confirm New Password</label>
           <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Lock size={18} className="text-slate-400" />
-            </div>
+           
             <input
               type="password"
               required
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="••••••••"
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm transition-colors outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              className="w-full pl-3 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm transition-colors outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             />
           </div>
         </div>
@@ -163,7 +159,7 @@ function ResetPasswordForm() {
 export default function ResetPasswordPage() {
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl border border-slate-100 p-8">
+      <div className="max-w-md w-full shadow-sm border border-slate-100 p-8">
         <Suspense fallback={<div className="text-center py-10 text-slate-400">Loading...</div>}>
           <ResetPasswordForm />
         </Suspense>
