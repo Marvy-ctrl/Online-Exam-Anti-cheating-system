@@ -68,7 +68,7 @@ export default function Dashboard() {
       
       {/* Overview Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-        <div className="bg-white p-6 border border-slate-200 shadow-sm hover:shadow-sm transition-shadow">
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-sm transition-shadow">
           <div className="flex justify-between items-start mb-4">
            
           </div>

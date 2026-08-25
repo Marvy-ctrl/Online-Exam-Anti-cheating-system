@@ -631,7 +631,7 @@ export default function ExamDetailWorkspace() {
           
           <Link 
             href={`/dashboard/institutions/${id}/exams/${exam_uid}/pre-enroll`}
-            className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 shadow-sm shadow-blue-600/20 whitespace-nowrap"
+            className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
           >
             <Users size={16}/> Bulk Pre-Enroll
           </Link>
@@ -730,7 +730,7 @@ export default function ExamDetailWorkspace() {
                   </p>
                   <button 
                     onClick={() => setIsEditingLink(true)}
-                    className="px-6 py-2.5 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all shadow-sm shadow-blue-600/20"
+                    className="px-6 py-2.5 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all"
                   >
                     Setup Enrollment Link
                   </button>
@@ -933,7 +933,7 @@ export default function ExamDetailWorkspace() {
                   <button
                     onClick={handleGenerateExamLink}
                     disabled={isGeneratingExamLink}
-                    className="shrink-0 px-5 py-2.5 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition-all shadow-lg shadow-green-600/20 disabled:opacity-50 flex items-center gap-2"
+                    className="shrink-0 px-5 py-2.5 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition-all disabled:opacity-50 flex items-center gap-2"
                   >
                     {isGeneratingExamLink ? 'Generating...' : 'Generate Exam Link'}
                   </button>

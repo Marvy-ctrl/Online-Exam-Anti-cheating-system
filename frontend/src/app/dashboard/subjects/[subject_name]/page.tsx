@@ -142,14 +142,12 @@ export default function GlobalSubjectDetailPage() {
       </div>
 
       {/* Header Context */}
-      <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm mb-8">
+      <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-xs mb-8">
         <div className="flex items-center gap-4 mb-6">
-          <div className="w-14 h-14 rounded-xl flex items-center justify-center text-blue-600">
-            <BookOpen size={28} />
-          </div>
+        
           <div>
-            <h1 className="text-3xl font-bold text-slate-900">{decodedName}</h1>
-            <p className="text-slate-500 mt-1">Global Subject Aggregation</p>
+            <h1 className="text-xl md:text-3xl font-bold text-slate-900">{decodedName}</h1>
+            <p className="text-xs md:text-sm text-slate-500 mt-1">Global Subject Aggregation</p>
           </div>
         </div>
 
@@ -179,7 +177,7 @@ export default function GlobalSubjectDetailPage() {
 
       <div className="space-y-8">
         {groupedExams.map(group => (
-          <div key={group.institution.uid} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+          <div key={group.institution.uid} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
             <div className="bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 {group.institution.logo_url ? (

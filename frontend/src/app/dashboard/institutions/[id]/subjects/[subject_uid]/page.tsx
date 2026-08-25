@@ -100,7 +100,7 @@ export default function SubjectWorkspace() {
         <div className="flex items-center gap-3">
           <button 
             onClick={() => setIsExamModalOpen(true)}
-            className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm shadow-blue-600/20"
+            className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
           >
             <Plus size={16}/> Create Exam
           </button>

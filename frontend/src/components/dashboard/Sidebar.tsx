@@ -22,8 +22,8 @@ const navItems = [
   { name: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
   { name: 'Institutions', href: '/dashboard/institutions', icon: Building2 },
   { name: 'Subjects', href: '/dashboard/subjects', icon: BookOpen },
-  { name: 'Exams', href: '/dashboard/exams', icon: FileText },
-  { name: 'Students', href: '/dashboard/students', icon: Users },
+  // { name: 'Exams', href: '/dashboard/exams', icon: FileText },
+  // { name: 'Students', href: '/dashboard/students', icon: Users },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
 ]
 
