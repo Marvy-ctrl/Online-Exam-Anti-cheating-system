@@ -645,7 +645,7 @@ export default function ExamPage() {
                   onClick={() => { setNavDrawerOpen(false); setShowSubmitModal(true) }}
                   className="w-full mt-2 py-3 bg-slate-900 text-white text-sm font-bold rounded-xl flex items-center justify-center gap-2"
                 >
-                  <Send size={15} /> Submit Final Script
+                   Submit Final Script
                 </button>
               </div>
             </div>
@@ -719,7 +719,7 @@ export default function ExamPage() {
                   onClick={() => setShowSubmitModal(true)}
                   className="px-6 md:px-8 py-2.5 md:py-3 bg-green-600 hover:bg-green-700 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-green-600/20 flex items-center gap-2"
                 >
-                  <Send size={16} /> Finish Exam
+                   Finish Exam
                 </button>
               )}
             </div>
@@ -776,8 +776,8 @@ export default function ExamPage() {
             </div>
 
             {answeredCount < totalCount && (
-              <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 mb-6 text-sm text-amber-300 text-center">
-                ⚠️ You have <strong>{totalCount - answeredCount}</strong> unanswered question{totalCount - answeredCount !== 1 ? 's' : ''}.
+              <div className="bg-amber-500/1 p-4 mb-6 text-sm text-amber-300 text-center">
+                You have <strong>{totalCount - answeredCount}</strong> unanswered question{totalCount - answeredCount !== 1 ? 's' : ''}.
                 Unanswered questions will receive no marks.
               </div>
             )}
