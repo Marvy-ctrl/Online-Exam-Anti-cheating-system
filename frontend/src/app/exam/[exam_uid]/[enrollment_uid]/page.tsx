@@ -2,7 +2,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 import { useParams, useRouter } from 'next/navigation'
-import { AlertTriangle, Camera, CheckCircle, Clock, Loader2, Send, ShieldAlert, X } from 'lucide-react'
+import { AlertTriangle, CheckCircle, Clock, Loader2, Menu, Send, ShieldAlert, X } from 'lucide-react'
 
 const BASE_URL = `${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"}/api/v1`
 
@@ -52,6 +52,7 @@ export default function ExamPage() {
 
   // Webcam
   const videoRef = useRef<HTMLVideoElement>(null)
+  const desktopVideoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [webcamStream, setWebcamStream] = useState<MediaStream | null>(null)
   const [faceStatus, setFaceStatus] = useState<'ok' | 'warning' | 'checking'>('checking')
@@ -66,6 +67,9 @@ export default function ExamPage() {
   // WebSocket State
   const wsRef = useRef<WebSocket | null>(null)
   const [wsConnected, setWsConnected] = useState(false)
+
+  // Mobile nav drawer
+  const [navDrawerOpen, setNavDrawerOpen] = useState(false)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -190,10 +194,11 @@ export default function ExamPage() {
     return () => stopWebcam()
   }, [])
 
-  // Effect 2: attach stream to the <video> element once BOTH are ready
+  // Effect 2: attach stream to the <video> elements once BOTH are ready
   useEffect(() => {
-    if (!webcamStream || !videoRef.current) return
-    videoRef.current.srcObject = webcamStream
+    if (!webcamStream) return
+    if (videoRef.current) videoRef.current.srcObject = webcamStream
+    if (desktopVideoRef.current) desktopVideoRef.current.srcObject = webcamStream
   }, [webcamStream, loading])
 
   const stopWebcam = () => {
@@ -473,56 +478,84 @@ export default function ExamPage() {
         </div>
       )}
 
-      {/* Top bar */}
-      <header className="h-16 shrink-0 bg-white border-b border-slate-200 flex items-center justify-between px-6 shadow-sm z-10">
-        <div className="flex items-center gap-28">
-          <div className="flex items-center">
-            <Image
-              src="/examloc_logo.png"
-              alt="ExamLoc Logo"
-              width={120}
-              height={32}
-              className="object-contain"
-            />
-          </div>
-          <div>
+      {/* ── TOP BAR ────────────────────────────────────────────────────────── */}
+      <header className="h-14 md:h-16 shrink-0 bg-white border-b border-slate-200 flex items-center justify-between px-3 md:px-6 shadow-sm z-10 gap-2">
+        {/* Left: hamburger (mobile) + logo */}
+        <div className="flex items-center gap-2 min-w-0">
+          {/* Mobile nav toggle */}
+          <button
+            id="mobile-nav-toggle"
+            className="md:hidden flex items-center justify-center w-9 h-9 rounded-lg bg-slate-100 text-slate-600 shrink-0"
+            onClick={() => setNavDrawerOpen(true)}
+            aria-label="Open question navigator"
+          >
+            <Menu size={20} />
+          </button>
+          <Image
+            src="/examloc_logo.png"
+            alt="ExamLoc Logo"
+            width={100}
+            height={28}
+            className="object-contain shrink-0"
+          />
+          {/* Student info — hidden on mobile */}
+          <div className="hidden md:block ml-8">
             <div className="flex items-center gap-2">
-               <span className="font-bold text-slate-900">{examData.student_first_name} {examData.student_last_name}</span>
-               <span className="text-slate-300">|</span>
-               <span className="text-xs font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">{examData.student_id}</span>
+              <span className="font-bold text-slate-900">{examData.student_first_name} {examData.student_last_name}</span>
+              <span className="text-slate-300">|</span>
+              <span className="text-xs font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">{examData.student_id}</span>
             </div>
             <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wider mt-0.5">
-               Exam ID: {examData.exam_uid.split('-')[0]} • {totalCount} Questions
+              Exam ID: {examData.exam_uid.split('-')[0]} • {totalCount} Questions
             </p>
           </div>
         </div>
-        
-        <div className="flex items-center gap-6">
-          <div className={`flex items-center gap-2 font-mono text-xl font-bold px-4 py-1.5 bg-slate-50 border border-slate-200 rounded-xl ${timerColor()}`}>
-            <Clock size={18} />
+
+        {/* Right: timer + submit */}
+        <div className="flex items-center gap-2 md:gap-6 shrink-0">
+          <div className={`flex items-center gap-1.5 font-mono text-base md:text-xl font-bold px-3 md:px-4 py-1.5 bg-slate-50 border border-slate-200 rounded-xl ${timerColor()}`}>
+            <Clock size={16} className="md:w-[18px] md:h-[18px]" />
             {formatTime(timeLeft)}
           </div>
           <button
             id="submit-exam-btn"
             onClick={() => setShowSubmitModal(true)}
             disabled={isSubmitting}
-            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-blue-600/20 disabled:opacity-50"
+            className="px-3 md:px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs md:text-sm font-bold rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-blue-600/20 disabled:opacity-50"
           >
-             Finish Exam
+            Finish
           </button>
         </div>
       </header>
 
-      {/* Three-column layout */}
+      {/* ── MOBILE: compact webcam strip ────────────────────────────────────── */}
+      <div className="md:hidden shrink-0 bg-slate-900 flex items-center gap-3 px-3 py-2 border-b border-slate-700">
+        <div className="relative rounded-xl overflow-hidden bg-black w-20 h-14 shrink-0 ring-1 ring-slate-600">
+          <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+          <canvas ref={canvasRef} className="hidden" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Live Monitoring Active</p>
+          <p className="text-xs text-slate-300 font-medium truncate">{examData.student_first_name} {examData.student_last_name}</p>
+          <p className="text-[10px] text-slate-500 font-mono truncate">{examData.student_id}</p>
+        </div>
+        {/* Mobile progress pill */}
+        <div className="shrink-0 text-right">
+          <div className="text-[10px] text-slate-400 uppercase tracking-wider">Progress</div>
+          <div className="text-sm font-black text-white">{answeredCount}<span className="text-slate-400 font-normal">/{totalCount}</span></div>
+        </div>
+      </div>
+
+      {/* ── BODY ────────────────────────────────────────────────────────────── */}
       <div className="flex flex-1 overflow-hidden">
 
-        {/* LEFT — Navigator */}
-        <aside className="w-64 shrink-0 bg-slate-50 border-r border-slate-200 flex flex-col overflow-y-auto">
+        {/* ── DESKTOP LEFT — Navigator ─────────────────────────────────────── */}
+        <aside className="hidden md:flex w-64 shrink-0 bg-slate-50 border-r border-slate-200 flex-col overflow-y-auto">
           <div className="p-5 border-b border-slate-200 bg-white">
             <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Question Navigator</div>
             <div className="flex items-center gap-2">
-               <div className="text-sm font-bold text-slate-900">{answeredCount}</div>
-               <div className="text-xs text-slate-400">of {totalCount} answered</div>
+              <div className="text-sm font-bold text-slate-900">{answeredCount}</div>
+              <div className="text-xs text-slate-400">of {totalCount} answered</div>
             </div>
           </div>
           <div className="p-4 grid grid-cols-4 gap-2.5">
@@ -557,15 +590,77 @@ export default function ExamPage() {
           </div>
         </aside>
 
-        {/* CENTER — Question */}
-        <main className="flex-1 overflow-y-auto p-8">
+        {/* ── MOBILE NAV DRAWER ────────────────────────────────────────────── */}
+        {navDrawerOpen && (
+          <>
+            {/* Overlay */}
+            <div
+              className="md:hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40"
+              onClick={() => setNavDrawerOpen(false)}
+            />
+            {/* Drawer panel */}
+            <div className="md:hidden fixed left-0 top-0 bottom-0 w-72 bg-white z-50 flex flex-col shadow-2xl">
+              <div className="flex items-center justify-between p-4 border-b border-slate-200">
+                <div>
+                  <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Question Navigator</div>
+                  <div className="text-sm font-bold text-slate-900 mt-0.5">{answeredCount} of {totalCount} answered</div>
+                </div>
+                <button
+                  onClick={() => setNavDrawerOpen(false)}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-100 text-slate-500"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4 grid grid-cols-5 gap-2.5">
+                {examData.questions.map((q, i) => {
+                  const isAnswered = !!answers[q.uid]
+                  const isCurrent = i === currentIdx
+                  return (
+                    <button
+                      key={q.uid}
+                      id={`mobile-nav-q-${i + 1}`}
+                      onClick={() => { setCurrentIdx(i); setNavDrawerOpen(false) }}
+                      className={`w-full aspect-square rounded-xl text-xs font-bold transition-all border ${
+                        isCurrent
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-600/20'
+                          : isAnswered
+                          ? 'bg-blue-50 text-blue-600 border-blue-200'
+                          : 'bg-white text-slate-400 border-slate-200'
+                      }`}
+                    >
+                      {i + 1}
+                    </button>
+                  )
+                })}
+              </div>
+              <div className="p-4 border-t border-slate-200 space-y-2">
+                <div className="flex items-center gap-3 text-xs font-medium text-slate-600">
+                  <div className="w-3 h-3 rounded bg-blue-50 border border-blue-200" /> Answered
+                </div>
+                <div className="flex items-center gap-3 text-xs font-medium text-slate-600">
+                  <div className="w-3 h-3 rounded bg-white border border-slate-200" /> Unanswered
+                </div>
+                <button
+                  onClick={() => { setNavDrawerOpen(false); setShowSubmitModal(true) }}
+                  className="w-full mt-2 py-3 bg-slate-900 text-white text-sm font-bold rounded-xl flex items-center justify-center gap-2"
+                >
+                  <Send size={15} /> Submit Final Script
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* ── CENTER — Question ─────────────────────────────────────────────── */}
+        <main className="flex-1 overflow-y-auto p-4 md:p-8">
           <div className="max-w-2xl mx-auto">
             {/* Question number + text */}
-            <div className="mb-8">
-              <div className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-3">
+            <div className="mb-6 md:mb-8">
+              <div className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-2 md:mb-3">
                 Question {currentIdx + 1} of {totalCount}
               </div>
-              <p className="text-xl text-slate-900 leading-relaxed font-semibold">
+              <p className="text-lg md:text-xl text-slate-900 leading-relaxed font-semibold">
                 {currentQuestion.question_text}
               </p>
               {saveStatus[currentQuestion.uid] === 'error' && (
@@ -576,7 +671,7 @@ export default function ExamPage() {
             </div>
 
             {/* Options */}
-            <div className="space-y-4">
+            <div className="space-y-3 md:space-y-4">
               {currentQuestion.options.map((opt, oi) => {
                 const isSelected = answers[currentQuestion.uid] === opt.uid
                 const letter = String.fromCharCode(65 + oi)
@@ -585,7 +680,7 @@ export default function ExamPage() {
                     key={opt.uid}
                     id={`opt-${currentIdx + 1}-${letter}`}
                     onClick={() => selectOption(currentQuestion.uid, opt.uid, examData.session_uid)}
-                    className={`w-full text-left p-5 rounded-2xl border-2 transition-all duration-200 flex items-start gap-4 group ${
+                    className={`w-full text-left p-4 md:p-5 rounded-2xl border-2 transition-all duration-200 flex items-start gap-3 md:gap-4 group ${
                       isSelected
                         ? 'bg-blue-50 border-blue-500 text-blue-900'
                         : 'bg-white border-slate-100 text-slate-600 hover:border-blue-200 hover:bg-slate-50 shadow-sm'
@@ -596,7 +691,7 @@ export default function ExamPage() {
                     }`}>
                       {letter}
                     </span>
-                    <span className="text-base font-medium leading-relaxed pt-1">{opt.option_text}</span>
+                    <span className="text-sm md:text-base font-medium leading-relaxed pt-1">{opt.option_text}</span>
                     {isSelected && <CheckCircle size={20} className="shrink-0 ml-auto text-blue-500 mt-1" />}
                   </button>
                 )
@@ -604,25 +699,25 @@ export default function ExamPage() {
             </div>
 
             {/* Navigation buttons */}
-            <div className="flex items-center justify-between mt-12 pt-8 border-t border-slate-100">
+            <div className="flex items-center justify-between mt-8 md:mt-12 pt-6 md:pt-8 border-t border-slate-100">
               <button
                 onClick={() => setCurrentIdx(i => Math.max(0, i - 1))}
                 disabled={currentIdx === 0}
-                className="px-6 py-3 bg-white border border-slate-200 text-slate-600 text-sm font-bold rounded-xl hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                className="px-4 md:px-6 py-2.5 md:py-3 bg-white border border-slate-200 text-slate-600 text-sm font-bold rounded-xl hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
               >
                 ← Back
               </button>
               {currentIdx < totalCount - 1 ? (
                 <button
                   onClick={() => setCurrentIdx(i => i + 1)}
-                  className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-blue-600/20"
+                  className="px-6 md:px-8 py-2.5 md:py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-blue-600/20"
                 >
-                  Next Question →
+                  Next →
                 </button>
               ) : (
                 <button
                   onClick={() => setShowSubmitModal(true)}
-                  className="px-8 py-3 bg-green-600 hover:bg-green-700 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-green-600/20 flex items-center gap-2"
+                  className="px-6 md:px-8 py-2.5 md:py-3 bg-green-600 hover:bg-green-700 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-green-600/20 flex items-center gap-2"
                 >
                   <Send size={16} /> Finish Exam
                 </button>
@@ -631,32 +726,15 @@ export default function ExamPage() {
           </div>
         </main>
 
-        {/* RIGHT — Webcam */}
-        <aside className="w-72 shrink-0 bg-slate-50 border-l border-slate-200 flex flex-col p-6 gap-6">
+        {/* ── DESKTOP RIGHT — Webcam + stats ───────────────────────────────── */}
+        <aside className="hidden md:flex w-72 shrink-0 bg-slate-50 border-l border-slate-200 flex-col p-6 gap-6">
           <div>
             <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Live Monitoring</div>
             <div className="relative rounded-2xl overflow-hidden bg-slate-900 aspect-[4/3] shadow-lg ring-1 ring-slate-200">
-              <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
-              <canvas ref={canvasRef} className="hidden" />
-              {/* Status overlay hidden from student */}
-              {/* <div className={`absolute bottom-3 left-3 right-3 flex items-center gap-2 text-[10px] font-bold px-3 py-1.5 rounded-xl backdrop-blur-md ${
-                faceStatus === 'ok' ? 'bg-green-600/90 text-white'
-                : faceStatus === 'warning' ? 'bg-red-600/90 text-white'
-                : 'bg-slate-800/90 text-slate-100'
-              }`}>
-                {faceStatus === 'ok' ? <><CheckCircle size={12} /> Identity Verified</>
-                : faceStatus === 'warning' ? <><AlertTriangle size={12} /> Alert Triggered</>
-                : <><Loader2 size={12} className="animate-spin" /> Analyzing...</>}
-              </div> */}
+              <video ref={desktopVideoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+              <canvas className="hidden" />
             </div>
           </div>
-
-          {/* Integrity scan hidden from student */}
-          {/* <div className="bg-white border border-slate-200 rounded-2xl p-5 text-center shadow-sm">
-            <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-2">Integrity Scan</div>
-            <div className="font-mono text-2xl text-blue-600 font-black tracking-tighter">{String(nextCheckIn).padStart(2, '0')}s</div>
-            <div className="text-[9px] text-slate-400 mt-2 font-medium">Automatic facial verification active</div>
-          </div> */}
 
           {/* Exam stats */}
           <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3 shadow-sm">
@@ -666,7 +744,7 @@ export default function ExamPage() {
                 <div className="text-slate-900 font-black text-lg">{answeredCount}/{totalCount}</div>
               </div>
               <div className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">
-                 {totalCount > 0 ? Math.round((answeredCount / totalCount) * 100) : 0}%
+                {totalCount > 0 ? Math.round((answeredCount / totalCount) * 100) : 0}%
               </div>
             </div>
             <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
@@ -688,12 +766,11 @@ export default function ExamPage() {
         </aside>
       </div>
 
-      {/* Submit modal */}
+      {/* ── SUBMIT MODAL ────────────────────────────────────────────────────── */}
       {showSubmitModal && (
         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-800 border border-white/10 rounded-2xl p-8 w-full max-w-md shadow-2xl">
+          <div className="bg-slate-800 border border-white/10 rounded-2xl p-6 md:p-8 w-full max-w-md shadow-2xl">
             <div className="text-center mb-6">
-            
               <h2 className="text-xl font-bold text-white mb-2">Submit Your Exam?</h2>
               <p className="text-slate-400 text-sm">This action cannot be undone.</p>
             </div>
@@ -708,7 +785,7 @@ export default function ExamPage() {
             <div className="flex gap-3">
               <button
                 onClick={() => setShowSubmitModal(false)}
-                className="flex-1 py-3 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-xl transition-colors"
+                className="flex-1 py-3 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-xl transition-colors text-sm"
               >
                 Continue Exam
               </button>

@@ -605,7 +605,7 @@ export default function ExamDetailWorkspace() {
               {wsConnected && getExamStatus(exam).label === 'Active' && (
                 <div className="mt-2 flex w-fit items-center gap-2 px-2 py-1 bg-green-50 border border-green-100 rounded-md">
                   <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-                  <span className="text-[10px] font-black text-green-700 uppercase tracking-widest">Live Monitoring Active</span>
+                  <span className="text-[10px] font-black text-green-700 uppercase tracking-widest">Live Monitoring</span>
                 </div>
               )}
             </div>
@@ -1447,7 +1447,7 @@ export default function ExamDetailWorkspace() {
         <div className="fixed bottom-6 right-6 w-80 max-h-[400px] bg-white border border-slate-200 rounded-2xl flex flex-col overflow-hidden z-40 animate-in slide-in-from-right duration-300">
           <div className="p-4 bg-slate-900 text-white flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Activity size={16} className="text-green-400" />
+              {/* <Activity size={16} className="text-green-400" /> */}
               <span className="text-xs font-bold uppercase tracking-widest">Live Activity Feed</span>
             </div>
             <button onClick={() => setShowLiveFeed(false)} className="hover:text-slate-400 transition-colors">
