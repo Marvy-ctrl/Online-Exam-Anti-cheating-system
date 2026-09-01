@@ -110,7 +110,7 @@ export default function AnalyticsPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Violation Trend */}
-        <div className="lg:col-span-2 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+        <div className="lg:col-span-2 bg-white p-6 rounded-3xl border border-slate-200 ">
           <div className="flex items-center justify-between mb-8">
             <h3 className="font-bold text-slate-900 text-lg flex items-center gap-2">
               {/* <Activity size={20} className="text-blue-600" /> */}
@@ -125,9 +125,9 @@ export default function AnalyticsPage() {
         </div>
 
         {/* Violation Distribution */}
-        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+        <div className="bg-white p-6 rounded-3xl border border-slate-200 ">
           <h3 className="font-bold text-slate-900 text-lg mb-8 flex items-center gap-2">
-            <ShieldAlert size={20} className="text-red-500" />
+            {/* <ShieldAlert size={20} className="text-red-500" /> */}
             Violation Types
           </h3>
           <ViolationDistributionChart data={data?.violation_distribution ?? []} />
@@ -136,10 +136,10 @@ export default function AnalyticsPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Session Trend */}
-        <div className="lg:col-span-2 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+        <div className="lg:col-span-2 bg-white p-6 rounded-3xl border border-slate-200 ">
           <div className="flex items-center justify-between mb-8">
             <h3 className="font-bold text-slate-900 text-lg flex items-center gap-2">
-              <BarChart3 size={20} className="text-emerald-600" />
+              {/* <BarChart3 size={20} className="text-emerald-600" /> */}
               Exam Activity
             </h3>
             <div className="flex items-center gap-2 text-xs font-medium text-slate-500 bg-slate-50 px-3 py-1 rounded-full">
@@ -151,9 +151,9 @@ export default function AnalyticsPage() {
         </div>
 
         {/* Top Violators */}
-        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+        <div className="bg-white p-6 rounded-3xl border border-slate-200 ">
           <h3 className="font-bold text-slate-900 text-lg mb-6 flex items-center gap-2">
-            <AlertTriangle size={20} className="text-amber-500" />
+            {/* <AlertTriangle size={20} className="text-amber-500" /> */}
             Most Violations
           </h3>
           <TopViolatorsList data={data?.top_violators ?? []} />
@@ -179,7 +179,7 @@ function StatCard({ title, value, isAlert = false, showPing = true }: {
   };
 
   return (
-    <div className={`bg-white p-6 rounded-2xl border ${isAlert ? 'border-red-100' : 'border-slate-200'} shadow-sm relative overflow-hidden group hover:shadow-sm transition-all`}>
+    <div className={`bg-white p-6 rounded-2xl border ${isAlert ? 'border-red-100' : 'border-slate-200'} relative overflow-hidden group transition-all`}>
       <div className="flex justify-between items-start">
         <div className="w-10 h-10 rounded-xl transition-colors" />
         {isAlert && value > 0 && showPing && (

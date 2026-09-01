@@ -23,13 +23,10 @@ export default function Hero() {
 
       <div className="relative max-w-5xl mx-auto px-6 pt-20 pb-18 flex flex-col items-center text-center">
         {/* Badge */}
-        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-blue-200 bg-blue-50 text-blue-600 text-[11px] font-semibold uppercase tracking-widest mb-7">
-          {/* <span className="relative flex h-1.5 w-1.5">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-500 opacity-75" />
-            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-blue-600" />
-          </span> */}
+        {/* <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-blue-200 bg-blue-50 text-blue-600 text-[11px] font-semibold uppercase tracking-widest mb-7">
+        
           REAL-TIME EXAM MONITORING{" "}
-        </div>
+        </div> */}
 
         {/* Headline */}
         <h1 className="text-5xl sm:text-6xl font-bold text-slate-900 leading-none tracking-tight mb-5 max-w-4xl">

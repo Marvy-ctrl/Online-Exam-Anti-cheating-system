@@ -63,7 +63,7 @@ export default function InstitutionsPage() {
           <p className="text-slate-500 max-w-sm mb-6">Create your first institution to start managing your subjects, exams, and students in a dedicated workspace.</p>
           <button 
             onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/20"
+            className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 transition-colors"
           >
             Create your first Institution
           </button>
@@ -74,7 +74,7 @@ export default function InstitutionsPage() {
             <Link 
               href={`/dashboard/institutions/${inst.uid}`} 
               key={inst.uid}
-              className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-sm hover:border-blue-300 transition-all group block relative"
+              className="bg-white p-6 rounded-2xl border border-slate-200 hover:border-blue-300 transition-all group block relative"
             >
               <div className="flex items-start justify-between mb-4">
                 <div className="w-12 h-12 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center overflow-hidden">

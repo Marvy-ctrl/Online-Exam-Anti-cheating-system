@@ -15,9 +15,7 @@ export default function TopViolatorsList({ data }: Props) {
   if (!data || data.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-slate-400 italic">
-        <div className="p-3 bg-slate-100 rounded-full mb-3">
-          <User size={24} />
-        </div>
+       
         <p>No violation history found</p>
       </div>
     )

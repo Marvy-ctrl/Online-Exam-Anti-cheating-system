@@ -120,7 +120,7 @@ export default function GuidePage() {
         {/* Tab/Sidebar Content Container */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* Steps Navigation Sidebar */}
-          <div className="lg:col-span-4 bg-white border border-slate-200 rounded-2xl p-4 space-y-2">
+          <div className="lg:col-span-4 border border-slate-200 p-4 space-y-2">
             <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider px-3 mb-3">
               Workflow Steps
             </h3>
@@ -130,7 +130,7 @@ export default function GuidePage() {
                 onClick={() => setActiveStep(idx)}
                 className={`w-full flex items-center gap-3.5 p-3 rounded-xl transition-all duration-200 text-left border ${
                   activeStep === idx
-                    ? "bg-blue-600 border-blue-600 text-white font-medium shadow-md shadow-blue-100"
+                    ? "bg-blue-600 border-blue-600 text-white font-medium"
                     : "bg-transparent border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50"
                 }`}
               >
@@ -160,7 +160,7 @@ export default function GuidePage() {
           </div>
 
           {/* Active Step Details Section */}
-          <div className="lg:col-span-8 bg-white border border-slate-200 rounded-2xl p-8 min-h-[500px] flex flex-col justify-between">
+          <div className="lg:col-span-8 border border-slate-200 p-8 min-h-[500px] flex flex-col justify-between">
             <div className="space-y-6">
               {/* Step Title Header */}
               <div className="flex items-start gap-4 border-b border-slate-100 pb-6">

@@ -589,7 +589,7 @@ export default function ExamDetailWorkspace() {
       </div>
 
       {/* Header Context */}
-      <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-xs mb-6 sm:mb-8 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5 sm:gap-6">
+      <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 mb-6 sm:mb-8 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5 sm:gap-6">
         <div className="w-full min-w-0">
           <div className="flex items-start gap-3 mb-3">
             <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
@@ -688,7 +688,7 @@ export default function ExamDetailWorkspace() {
       </div>
 
       {/* Tab Context Container */}
-      <div className="bg-white shadow-xs rounded-2xl border border-slate-200 p-4 sm:p-8 min-h-[400px]">
+      <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-8 min-h-[400px]">
         {activeTab === 'overview' && (
           <div className="space-y-8">
             <div>
@@ -737,7 +737,7 @@ export default function ExamDetailWorkspace() {
 
                   {isEditingLink && (
                     <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 animate-in zoom-in-95 duration-200">
+                      <div className="bg-white rounded-2xl w-full max-w-md p-6 animate-in zoom-in-95 duration-200">
                          <h3 className="text-xl font-bold text-slate-900 mb-2">Configure Enrollment Window</h3>
                          <p className="text-sm text-slate-500 mb-6">Set the specific dates when students are allowed to use this link.</p>
                          
@@ -762,7 +762,7 @@ export default function ExamDetailWorkspace() {
                             <button 
                               onClick={handleGenerateLink}
                               disabled={isGenerating}
-                              className="flex-1 py-2.5 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20 disabled:opacity-50"
+                              className="flex-1 py-2.5 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all disabled:opacity-50"
                             >
                               {isGenerating ? "Generating..." : "Generate Link"}
                             </button>
@@ -791,7 +791,7 @@ export default function ExamDetailWorkspace() {
                       
                       {isEditingLink && (
                         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 animate-in zoom-in-95 duration-200">
+                          <div className="bg-white rounded-2xl w-full max-w-md p-6 animate-in zoom-in-95 duration-200">
                              <h3 className="text-xl font-bold text-slate-900 mb-2">Update Enrollment Window</h3>
                              <p className="text-sm text-slate-500 mb-6">Modify when the enrollment link expires.</p>
                              
@@ -816,7 +816,7 @@ export default function ExamDetailWorkspace() {
                                 <button 
                                   onClick={handleGenerateLink}
                                   disabled={isGenerating}
-                                  className="flex-1 py-2.5 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20 disabled:opacity-50"
+                                  className="flex-1 py-2.5 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all  disabled:opacity-50"
                                 >
                                   {isGenerating ? "Updating..." : "Update Link"}
                                 </button>
@@ -859,7 +859,7 @@ export default function ExamDetailWorkspace() {
                   </div>
 
                   {/* Invitation Tool */}
-                  <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm">
+                  <div className="bg-white border border-slate-100 rounded-2xl p-5 ">
                     <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
                       Send Email Invitations
                     </h3>
@@ -878,8 +878,8 @@ export default function ExamDetailWorkspace() {
                         disabled={isSending || students.filter(s => s.status !== 'enrolled').length === 0}
                         className={`w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${
                           sendSuccess 
-                            ? 'bg-green-600 text-white shadow-lg shadow-green-600/20' 
-                            : 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/20 disabled:opacity-50 disabled:cursor-not-allowed'
+                            ? 'bg-green-600 text-white ' 
+                            : 'bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed'
                         }`}
                       >
                         {isSending ? (
@@ -968,7 +968,7 @@ export default function ExamDetailWorkspace() {
                     <p className="text-[11px] text-slate-400 italic">Share this link directly or use the email button →</p>
                   </div>
 
-                  <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+                  <div className="bg-white border border-slate-200 rounded-2xl p-5">
                     <h3 className="font-bold text-slate-900 mb-1 flex items-center gap-2">
                       {/* <Mail size={18} className="text-green-600" /> */}
                       Send to Enrolled Students
@@ -982,7 +982,7 @@ export default function ExamDetailWorkspace() {
                       className={`w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${
                         sendExamLinkSuccess
                           ? 'bg-green-600 text-white'
-                          : 'bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-600/20 disabled:opacity-50 disabled:cursor-not-allowed'
+                          : 'bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed'
                       }`}
                     >
                       {isSendingExamLink ? (
@@ -1118,7 +1118,7 @@ export default function ExamDetailWorkspace() {
                     <button
                       onClick={handleOpenBulkRelease}
                       disabled={isReleasingResults}
-                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50"
                     >
                        Release result to students ({selectedSessionUids.size})
                     </button>
@@ -1224,7 +1224,7 @@ export default function ExamDetailWorkspace() {
                               </button>
                               <button
                                 onClick={() => handleOpenSingleRelease(res.session_uid, res.student_name)}
-                                className="px-1.5 sm:px-3 py-1 bg-white border border-slate-200 text-slate-600 rounded-lg text-[10px] sm:text-xs hover:bg-slate-50 hover:border-blue-300 font-bold transition-all inline-flex items-center justify-center gap-1 shadow-sm shadow-blue-600/10"
+                                className="px-1.5 sm:px-3 py-1 bg-white border border-slate-200 text-slate-600 rounded-lg text-[10px] sm:text-xs hover:bg-slate-50 hover:border-blue-300 font-bold transition-all inline-flex items-center justify-center gap-1"
                               >
                                  Send Result
                               </button>
@@ -1349,7 +1349,7 @@ export default function ExamDetailWorkspace() {
                 <button
                   type="submit"
                   disabled={isUpdatingExam}
-                  className="px-6 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20 disabled:opacity-50"
+                  className="px-6 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all disabled:opacity-50"
                 >
                   {isUpdatingExam ? "Saving Changes..." : "Save Configuration"}
                 </button>
@@ -1361,7 +1361,7 @@ export default function ExamDetailWorkspace() {
       {/* Update Score Modal */}
       {showScoreModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8 animate-in zoom-in-95 duration-200">
+           <div className="bg-white rounded-2xl w-full max-w-md p-8 animate-in zoom-in-95 duration-200">
               <h3 className="text-xl font-bold text-slate-900 mb-2">Adjust Student Score</h3>
               <p className="text-sm text-slate-500 mb-6">Manually update <strong>{selectedSession?.student_name}</strong>`s results.</p>
               
@@ -1398,7 +1398,7 @@ export default function ExamDetailWorkspace() {
                 <button 
                   onClick={handleUpdateScore}
                   disabled={isUpdatingScore}
-                  className="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20 disabled:opacity-50"
+                  className="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all disabled:opacity-50"
                 >
                   {isUpdatingScore ? "Updating..." : "Save Changes"}
                 </button>
@@ -1410,7 +1410,7 @@ export default function ExamDetailWorkspace() {
       {/* Release Results Modal */}
       {showReleaseModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8 animate-in zoom-in-95 duration-200">
+           <div className="bg-white rounded-2xl w-full max-w-md p-8 animate-in zoom-in-95 duration-200">
               <h3 className="text-xl font-bold text-slate-900 mb-2">Release Exam Results</h3>
               <p className="text-sm text-slate-500 mb-6">
                 {releaseMode === 'bulk' 
@@ -1429,7 +1429,7 @@ export default function ExamDetailWorkspace() {
                 <button 
                   onClick={handleConfirmRelease}
                   disabled={isReleasingResults}
-                  className="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20 disabled:opacity-50 flex items-center justify-center gap-1.5"
+                  className="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all disabled:opacity-50 flex items-center justify-center gap-1.5"
                 >
                   {isReleasingResults ? (
                     <>
@@ -1444,7 +1444,7 @@ export default function ExamDetailWorkspace() {
       )}
       {/* Live Activity Feed Overlay */}
       {wsConnected && showLiveFeed && getExamStatus(exam).label === 'Active' && (
-        <div className="fixed bottom-6 right-6 w-80 max-h-[400px] bg-white border border-slate-200 rounded-2xl shadow-2xl flex flex-col overflow-hidden z-40 animate-in slide-in-from-right duration-300">
+        <div className="fixed bottom-6 right-6 w-80 max-h-[400px] bg-white border border-slate-200 rounded-2xl flex flex-col overflow-hidden z-40 animate-in slide-in-from-right duration-300">
           <div className="p-4 bg-slate-900 text-white flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Activity size={16} className="text-green-400" />
@@ -1462,7 +1462,7 @@ export default function ExamDetailWorkspace() {
               </div>
             ) : (
               liveEvents.map(event => (
-                <div key={event.id} className="p-3 bg-white border border-slate-200 rounded-xl shadow-sm animate-in fade-in slide-in-from-top-1 duration-300">
+                <div key={event.id} className="p-3 bg-white border border-slate-200 rounded-xl animate-in fade-in slide-in-from-top-1 duration-300">
                   <div className="flex items-start justify-between mb-1">
                     <span className="text-[10px] font-bold text-slate-900 truncate max-w-[140px]">{event.student_name}</span>
                     <span className="text-[8px] font-mono text-slate-400">{new Date(event.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
@@ -1483,7 +1483,7 @@ export default function ExamDetailWorkspace() {
       {wsConnected && !showLiveFeed && getExamStatus(exam).label === 'Active' && (
         <button 
           onClick={() => setShowLiveFeed(true)}
-          className="fixed bottom-6 right-6 w-12 h-12 bg-slate-900 text-white rounded-full shadow-xl flex items-center justify-center hover:scale-110 transition-transform z-40"
+          className="fixed bottom-6 right-6 w-12 h-12 bg-slate-900 text-white rounded-full flex items-center justify-center hover:scale-110 transition-transform z-40"
         >
           <Activity size={20} className="text-green-400" />
           {liveEvents.length > 0 && (
@@ -1496,7 +1496,7 @@ export default function ExamDetailWorkspace() {
       {/* Toast Notification */}
       {toast && (
         <div
-          className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-xl border text-sm font-semibold animate-in slide-in-from-bottom-4 duration-300 ${
+          className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3 px-5 py-3.5 rounded-2xl border text-sm font-semibold animate-in slide-in-from-bottom-4 duration-300 ${
             toast.type === 'success'
               ? 'bg-white border-green-200 text-slate-800'
               : 'bg-white border-red-200 text-slate-800'

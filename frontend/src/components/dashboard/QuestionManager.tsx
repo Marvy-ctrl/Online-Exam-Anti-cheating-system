@@ -251,7 +251,7 @@ export default function QuestionManager({ examUid }: QuestionManagerProps) {
         <div className="grid w-full grid-cols-2 gap-2 md:flex md:w-auto">
           <button 
             onClick={() => { setIsAdding(true); setIsBulkAdding(false); setIsEditing(false); }}
-            className="col-span-2 inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700 md:order-3 md:col-span-1 md:py-2"
+            className="col-span-2 inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 md:order-3 md:col-span-1 md:py-2"
           >
             <Plus size={16} /> Add Question
           </button>
@@ -289,7 +289,7 @@ export default function QuestionManager({ examUid }: QuestionManagerProps) {
 
       {/* Add / Edit Form */}
       {(isAdding || isEditing) && (
-        <div className="bg-white border border-blue-100 rounded-2xl p-6 shadow-sm animate-in slide-in-from-top-2 duration-300">
+        <div className="bg-white border border-blue-100 rounded-2xl p-6 animate-in slide-in-from-top-2 duration-300">
           <div className="flex justify-between items-center mb-6">
             <h3 className="font-bold text-slate-900">
               {isEditing ? 'Edit Question' : 'Create New Question'}
@@ -316,7 +316,7 @@ export default function QuestionManager({ examUid }: QuestionManagerProps) {
                 min="0"
                 value={newMarks}
                 onChange={(e) => setNewMarks(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl text-sm focus:border-blue-500 outline-none transition-all shadow-sm"
+                className="w-full bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl text-sm focus:border-blue-500 outline-none transition-all"
               />
             </div>
 
@@ -354,7 +354,7 @@ export default function QuestionManager({ examUid }: QuestionManagerProps) {
                         setNewOptions(updated)
                       }}
                       placeholder={`Option ${idx + 1}`}
-                      className="flex-1 bg-white border border-slate-200 px-4 py-2.5 rounded-lg text-sm focus:border-blue-500 outline-none transition-all shadow-sm"
+                      className="flex-1 bg-white border border-slate-200 px-4 py-2.5 rounded-lg text-sm focus:border-blue-500 outline-none transition-all "
                     />
                     <button 
                       onClick={() => removeOptionField(idx)}
@@ -378,7 +378,7 @@ export default function QuestionManager({ examUid }: QuestionManagerProps) {
               <button 
                 onClick={isEditing ? handleUpdateQuestion : handleAddQuestion}
                 disabled={loading}
-                className="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20 disabled:opacity-50"
+                className="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all disabled:opacity-50"
               >
                 {loading ? (isEditing ? "Updating..." : "Adding...") : (isEditing ? "Update Question" : "Save Question")}
               </button>
@@ -395,7 +395,7 @@ export default function QuestionManager({ examUid }: QuestionManagerProps) {
 
       {/* Bulk JSON Form */}
       {isBulkAdding && (
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm animate-in slide-in-from-top-2 duration-300">
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 animate-in slide-in-from-top-2 duration-300">
            <div className="flex justify-between items-center mb-4">
             <div>
               <h3 className="font-bold text-slate-900">Bulk Upload (JSON)</h3>
@@ -415,7 +415,7 @@ export default function QuestionManager({ examUid }: QuestionManagerProps) {
             <button 
               onClick={handleBulkUpload}
               disabled={loading || !bulkData.trim()}
-              className="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20 disabled:opacity-50"
+              className="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all disabled:opacity-50"
             >
               {loading ? "Uploading..." : "Upload Questions"}
             </button>
@@ -433,9 +433,7 @@ export default function QuestionManager({ examUid }: QuestionManagerProps) {
       <div className="space-y-4">
         {questions.length === 0 && !loading && !isAdding && !isBulkAdding && (
           <div className="py-20 flex flex-col items-center justify-center bg-slate-50 rounded-3xl border border-dashed border-slate-200 text-center">
-            <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-slate-300 mb-4 shadow-sm">
-               <List size={32} />
-            </div>
+            
             <h3 className="text-lg font-bold text-slate-900 mb-1">No Questions Yet</h3>
             <p className="text-slate-500 text-sm max-w-xs mx-auto">
               Start by adding a single question manually or bulk upload using JSON format.
@@ -461,7 +459,7 @@ export default function QuestionManager({ examUid }: QuestionManagerProps) {
           <div 
             key={q.uid} 
             className={`bg-white border rounded-2xl p-6 hover:border-blue-200 transition-all group relative ${
-              selectedUids.includes(q.uid) ? 'border-blue-300 ring-1 ring-blue-100 shadow-sm' : 'border-slate-200'
+              selectedUids.includes(q.uid) ? 'border-blue-300 ring-1 ring-blue-100' : 'border-slate-200'
             }`}
           >
             <div className="flex items-start justify-between gap-4 mb-4">

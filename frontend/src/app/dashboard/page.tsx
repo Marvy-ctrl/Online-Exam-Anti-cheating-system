@@ -68,7 +68,7 @@ export default function Dashboard() {
       
       {/* Overview Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-sm transition-shadow">
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 transition-shadow">
           <div className="flex justify-between items-start mb-4">
            
           </div>
@@ -78,7 +78,7 @@ export default function Dashboard() {
           <h3 className="font-medium text-slate-500 text-sm">Institutions</h3>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-sm transition-shadow">
+        <div className="bg-white p-6 rounded-2xl border border-slate-200  transition-shadow">
          
           <p className="text-3xl text-slate-900 font-bold mb-1">
             {loading ? "..." : overview?.active_exams_count ?? 0}
@@ -86,7 +86,7 @@ export default function Dashboard() {
           <h3 className="font-medium text-slate-500 text-sm">Active Exams</h3>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-sm transition-shadow">
+        <div className="bg-white p-6 rounded-2xl border border-slate-200  transition-shadow">
           <div className="flex justify-between items-start mb-4">
          
           </div>
@@ -96,7 +96,7 @@ export default function Dashboard() {
           <h3 className="font-medium text-slate-500 text-sm">Total Students</h3>
         </div>
         
-        <div className="bg-white p-6 rounded-2xl border border-red-100 shadow-sm hover:shadow-sm transition-shadow relative overflow-hidden">
+        <div className="bg-white p-6 rounded-2xl border border-red-100 transition-shadow relative overflow-hidden">
           <div className="absolute top-0 right-0 w-20 h-20 bg-red-50 rounded-bl-full -mr-10 -mt-10 pointer-events-none"></div>
           <div className="flex justify-between items-start mb-4 relative z-10">
           
@@ -112,15 +112,15 @@ export default function Dashboard() {
       <h2 className="text-xl font-bold text-slate-900 mb-6">Recent Activity</h2>
       
       {loading ? (
-        <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center shadow-sm">
+        <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center">
           <p className="text-slate-500 animate-pulse">Loading recent activity...</p>
         </div>
       ) : !overview?.recent_activities || overview.recent_activities.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center shadow-sm">
+        <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center">
           <p className="text-slate-500">No recent activity found. Start by creating an institution!</p>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100 overflow-hidden shadow-sm">
+        <div className="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100 overflow-hidden">
           {overview.recent_activities.map((activity, idx) => {
             let Icon = Activity;
             let iconBg = "bg-slate-50 text-slate-600";

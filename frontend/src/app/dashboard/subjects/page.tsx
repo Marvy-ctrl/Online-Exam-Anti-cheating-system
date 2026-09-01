@@ -81,7 +81,7 @@ export default function GlobalSubjectsPage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-200 p-6 mb-8 shadow-xs">
+      <div className="bg-white rounded-2xl border border-slate-200 p-6 mb-8 ">
         <div className="relative max-w-md">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <Search className="h-5 w-5 text-slate-400" />
@@ -105,7 +105,7 @@ export default function GlobalSubjectsPage() {
           <p className="text-slate-500 max-w-sm mb-6">You have not created any subjects yet. Go to an institution workspace to create your first subject.</p>
           <Link 
             href="/dashboard/institutions"
-            className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/20"
+            className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 transition-colors"
           >
             Go to Institutions
           </Link>
@@ -116,7 +116,7 @@ export default function GlobalSubjectsPage() {
             <Link 
               href={`/dashboard/subjects/${encodeURIComponent(sub.name)}`} 
               key={sub.name}
-              className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs hover:shadow-sm hover:border-blue-300 transition-all group block relative"
+              className="bg-white p-6 rounded-2xl border border-slate-200 hover:border-blue-300 transition-all group block relative"
             >
               <div className="flex items-start justify-between mb-4">
                 <div className=" flex items-center justify-center overflow-hidden">

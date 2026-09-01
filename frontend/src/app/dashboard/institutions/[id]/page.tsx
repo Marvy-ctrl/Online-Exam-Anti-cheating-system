@@ -224,7 +224,7 @@ export default function InstitutionWorkspace() {
           <span className="text-slate-900 truncate">{institution.name} Workspace</span>
         </div>
         
-        <div className="flex flex-col gap-5 bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-xs lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-col gap-5 bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 items-center gap-3 sm:gap-4">
             <div className="w-14 h-14 sm:w-16 sm:h-16 shrink-0 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center overflow-hidden">
                {institution.logo_url ? (
@@ -321,7 +321,7 @@ export default function InstitutionWorkspace() {
       </div>
 
       {/* Tab Content Areas */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-8 min-h-[400px]">
+      <div className="rounded-2xl border border-slate-200 p-4 sm:p-8 min-h-[400px]">
         {activeTab === 'exams' && (
           <div>
             <h2 className="text-lg font-bold text-slate-900 mb-4">Active Exams</h2>
@@ -333,7 +333,7 @@ export default function InstitutionWorkspace() {
                   <Link 
                     key={exam.uid} 
                     href={`/dashboard/institutions/${id}/exams/${exam.uid}`}
-                    className="group flex flex-col p-4 sm:p-5 border border-slate-200 rounded-xl hover:border-blue-300 hover:shadow-md transition-all bg-white"
+                    className="group flex flex-col p-4 sm:p-5 border border-slate-200 rounded-xl hover:border-blue-300 transition-all bg-white"
                   >
                     <div className="flex justify-between items-start mb-4">
                       <div>
