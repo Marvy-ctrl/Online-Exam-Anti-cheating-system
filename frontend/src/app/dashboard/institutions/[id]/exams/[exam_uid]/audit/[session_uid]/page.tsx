@@ -231,7 +231,7 @@ export default function SessionAuditPage() {
   if (error || !auditDetails) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-        <div className="bg-white border border-slate-200 rounded-2xl p-10 max-w-md text-center shadow-sm">
+        <div className="bg-white border border-slate-200 rounded-2xl p-10 max-w-md text-center">
           <div className="w-14 h-14 bg-red-50 border border-red-200 rounded-2xl flex items-center justify-center mx-auto mb-5">
             <AlertTriangle size={28} className="text-red-500" />
           </div>
@@ -253,112 +253,116 @@ export default function SessionAuditPage() {
 
       {/* ── Top Nav ───────────────────────────────────────────────────────── */}
       <div className="sticky top-0 z-40 bg-white border-b border-slate-200">
-        <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => router.back()}
-              className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors text-slate-500 hover:text-slate-900"
-            >
-              <ArrowLeft size={17} />
-            </button>
-            <div className="h-4 w-px bg-slate-200" />
-            <nav className="flex items-center gap-1 text-xs font-medium text-slate-400">
-              <Link href={`/dashboard/institutions/${id}`} className="hover:text-blue-600 transition-colors">Institution</Link>
-              <ChevronRight size={11} />
-              <Link href={`/dashboard/institutions/${id}/exams/${exam_uid}`} className="hover:text-blue-600 transition-colors">Exam</Link>
-              <ChevronRight size={11} />
-              <span className="text-slate-700 font-semibold">Student Log</span>
-            </nav>
-          </div>
-          <div className="flex items-center gap-3">
-            {isSubmitted && (
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-2 sm:py-0">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between min-h-[56px]">
+            <div className="flex items-center gap-3 min-w-0">
               <button
-                onClick={handleSendResult}
-                disabled={sendingEmail}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all ${
-                  emailSent 
-                  ? 'bg-green-500 text-white' 
-                  : 'bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50'
-                }`}
+                onClick={() => router.back()}
+                className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors text-slate-500 hover:text-slate-900 flex-shrink-0"
               >
-                {sendingEmail ? (
-                  <>
-                    <Loader2 size={13} className="animate-spin" />
-                    Sending...
-                  </>
-                ) : emailSent ? (
-                  <>
-                    Result Sent
-                  </>
-                ) : (
-                  <>
-                    Send Result to Student
-                  </>
-                )}
+                <ArrowLeft size={17} />
               </button>
-            )}
-            <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border ${isSubmitted ? 'bg-green-50 text-green-700 border-green-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
-              {auditDetails.status}
-            </span>
+              <div className="hidden sm:block h-4 w-px bg-slate-200" />
+              <nav className="flex flex-wrap items-center gap-1 text-[10px] sm:text-xs font-medium text-slate-400 min-w-0">
+                <Link href={`/dashboard/institutions/${id}`} className="hover:text-blue-600 transition-colors truncate">Institution</Link>
+                <ChevronRight size={11} />
+                <Link href={`/dashboard/institutions/${id}/exams/${exam_uid}`} className="hover:text-blue-600 transition-colors truncate">Exam</Link>
+                <ChevronRight size={11} />
+                <span className="text-slate-700 font-semibold truncate">Student Log</span>
+              </nav>
+            </div>
+            <div className="flex items-center justify-between gap-2 sm:justify-end">
+              {isSubmitted && (
+                <button
+                  onClick={handleSendResult}
+                  disabled={sendingEmail}
+                  className={`flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-[10px] sm:text-[11px] font-bold transition-all ${
+                    emailSent 
+                    ? 'bg-green-500 text-white' 
+                    : 'bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50'
+                  }`}
+                >
+                  {sendingEmail ? (
+                    <>
+                      <Loader2 size={13} className="animate-spin" />
+                      Sending...
+                    </>
+                  ) : emailSent ? (
+                    <>
+                      Result Sent
+                    </>
+                  ) : (
+                    <>
+                      Send Result to Student
+                    </>
+                  )}
+                </button>
+              )}
+              <span className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border ${isSubmitted ? 'bg-green-50 text-green-700 border-green-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
+                {auditDetails.status}
+              </span>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-6 py-8 space-y-6">
+      <div className="max-w-6xl mx-auto px-4 py-5 sm:px-6 sm:py-8 space-y-4 sm:space-y-6">
 
         {/* ── Candidate Banner ──────────────────────────────────────────── */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
-          <div className="flex items-center gap-5">
-            <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-bold text-xl flex-shrink-0">
-              {initials}
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Candidate</p>
-              <h1 className="text-2xl font-bold text-slate-900 leading-tight">{auditDetails.student_name}</h1>
-              <div className="flex flex-wrap items-center gap-4 mt-1.5">
-                <span className="flex items-center gap-1.5 text-xs text-slate-500">
-                  <Hash size={11} className="text-slate-400" />{auditDetails.student_id}
-                </span>
-                <span className="flex items-center gap-1.5 text-xs text-slate-500">
-                  <Mail size={11} className="text-slate-400" />{auditDetails.email}
-                </span>
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-6">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-4 sm:gap-5 min-w-0">
+              <div className="w-14 h-14 sm:w-16 sm:h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-bold text-lg sm:text-xl flex-shrink-0">
+                {initials}
               </div>
-            </div>
-          </div>
-
-          {/* Stats row */}
-          <div className="flex items-stretch gap-3 flex-wrap">
-            {[
-              {
-                label: 'Score',
-                value: auditDetails.score !== null ? `${auditDetails.score} / ${auditDetails.total_marks || 0}` : '--',
-                sub: 'Final result',
-                icon: <TrendingUp size={13} className="text-blue-500" />,
-                accent: 'border-slate-200',
-              },
-              {
-                label: 'Violations',
-                value: `${auditDetails.violations.length}`,
-                sub: auditDetails.violations.length === 0 ? 'Clean session' : 'Events recorded',
-                icon: <AlertTriangle size={13} className={auditDetails.violations.length === 0 ? 'text-green-500' : 'text-red-500'} />,
-                accent: auditDetails.violations.length === 0 ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50',
-              },
-              {
-                label: 'Duration',
-                value: duration,
-                sub: 'Session length',
-                icon: <Clock size={13} className="text-slate-400" />,
-                accent: 'border-slate-200',
-              },
-            ].map(s => (
-              <div key={s.label} className={`border rounded-xl p-4 min-w-[110px] bg-white ${s.accent}`}>
-                <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-2">
-                  {s.icon} {s.label}
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Candidate</p>
+                <h1 className="text-xl sm:text-2xl font-bold text-slate-900 leading-tight break-words">{auditDetails.student_name}</h1>
+                <div className="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-1 sm:gap-4 mt-1.5">
+                  <span className="flex items-center gap-1.5 text-[11px] sm:text-xs text-slate-500">
+                    <Hash size={11} className="text-slate-400" />{auditDetails.student_id}
+                  </span>
+                  <span className="flex items-center gap-1.5 text-[11px] sm:text-xs text-slate-500 break-all">
+                    <Mail size={11} className="text-slate-400 flex-shrink-0" />{auditDetails.email}
+                  </span>
                 </div>
-                <div className="text-xl font-bold text-slate-900">{s.value}</div>
-                <div className="text-[10px] text-slate-400 mt-0.5">{s.sub}</div>
               </div>
-            ))}
+            </div>
+
+            {/* Stats row */}
+            <div className="grid grid-cols-1 gap-3 w-full sm:w-auto sm:grid-cols-3 sm:flex sm:items-stretch sm:gap-3">
+              {[
+                {
+                  label: 'Score',
+                  value: auditDetails.score !== null ? `${auditDetails.score} / ${auditDetails.total_marks || 0}` : '--',
+                  sub: 'Final result',
+                  icon: <TrendingUp size={13} className="text-blue-500" />,
+                  accent: 'border-slate-200',
+                },
+                {
+                  label: 'Violations',
+                  value: `${auditDetails.violations.length}`,
+                  sub: auditDetails.violations.length === 0 ? 'Clean session' : 'Events recorded',
+                  icon: <AlertTriangle size={13} className={auditDetails.violations.length === 0 ? 'text-green-500' : 'text-red-500'} />,
+                  accent: auditDetails.violations.length === 0 ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50',
+                },
+                {
+                  label: 'Duration',
+                  value: duration,
+                  sub: 'Session length',
+                  icon: <Clock size={13} className="text-slate-400" />,
+                  accent: 'border-slate-200',
+                },
+              ].map(s => (
+                <div key={s.label} className={`border rounded-xl p-3 sm:p-4 bg-white ${s.accent}`}>
+                  <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-2">
+                    {s.icon} {s.label}
+                  </div>
+                  <div className="text-lg sm:text-xl font-bold text-slate-900">{s.value}</div>
+                  <div className="text-[10px] text-slate-400 mt-0.5">{s.sub}</div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -464,11 +468,10 @@ export default function SessionAuditPage() {
                 </span>
               </div>
 
-              <div className="p-7">
+              <div className="p-4 sm:p-7">
                 {auditDetails.violations.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-16 text-center">
-                  
-                    <h4 className="text-lg font-bold text-slate-900 mb-1">No violations Detected</h4>
+                  <div className="flex flex-col items-center justify-center py-12 sm:py-16 text-center">
+                    <h4 className="text-base sm:text-lg font-bold text-slate-900 mb-1">No violations Detected</h4>
                     <p className="text-sm text-slate-400 max-w-xs">
                       The candidate maintained full compliance throughout the examination session.
                     </p>
@@ -476,7 +479,7 @@ export default function SessionAuditPage() {
                 ) : (
                   <div className="relative">
                     {/* Vertical guide line */}
-                    <div className="absolute left-[15px] top-5 bottom-5 w-px bg-slate-100" />
+                    <div className="absolute left-[14px] sm:left-[15px] top-5 bottom-5 w-px bg-slate-100" />
 
                     <div className="space-y-4">
                       {auditDetails.violations
@@ -485,17 +488,17 @@ export default function SessionAuditPage() {
                           const cfg = getConfig(v.type)
                           const time = new Date(v.time)
                           return (
-                            <div key={idx} className="relative flex gap-5 group">
+                            <div key={idx} className="relative flex gap-3 sm:gap-5 group">
                               {/* Dot */}
-                              <div className={`relative z-10 w-8 h-8 flex-shrink-0 rounded-full border-2 ${cfg.borderColor} ${cfg.bgColor} flex items-center justify-center mt-0.5 group-hover:scale-105 transition-transform ${cfg.textColor}`}>
+                              <div className={`relative z-10 w-7 h-7 sm:w-8 sm:h-8 flex-shrink-0 rounded-full border-2 ${cfg.borderColor} ${cfg.bgColor} flex items-center justify-center mt-0.5 group-hover:scale-105 transition-transform ${cfg.textColor}`}>
                                 {cfg.icon}
                               </div>
 
                               {/* Card */}
-                              <div className={`flex-1 border ${cfg.borderColor} ${cfg.bgColor} rounded-xl p-4 hover:shadow-sm transition-shadow`}>
-                                <div className="flex items-start justify-between gap-4">
+                              <div className={`flex-1 border ${cfg.borderColor} ${cfg.bgColor} rounded-xl p-3 sm:p-4 transition-shadow`}>
+                                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                                   <div>
-                                    <div className="flex items-center gap-2 mb-1">
+                                    <div className="flex flex-wrap items-center gap-2 mb-1">
                                       <span className={`text-sm font-bold ${cfg.textColor}`}>{cfg.label}</span>
                                       <span className={`text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${SEVERITY_BADGE[cfg.severity]}`}>
                                         {cfg.severity}
@@ -505,8 +508,8 @@ export default function SessionAuditPage() {
                                       Security violation logged.
                                     </p>
                                   </div>
-                                  <div className="text-right flex-shrink-0">
-                                    <p className={`font-mono text-sm font-bold ${cfg.textColor}`}>
+                                  <div className="text-left sm:text-right flex-shrink-0">
+                                    <p className={`font-mono text-xs sm:text-sm font-bold ${cfg.textColor}`}>
                                       {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                                     </p>
                                     <p className="text-[10px] text-slate-400 mt-0.5">
@@ -525,14 +528,12 @@ export default function SessionAuditPage() {
                       <div className="mt-6 text-center border-t border-slate-100 pt-4">
                         <button
                           onClick={() => setShowAllViolations(!showAllViolations)}
-                          className="px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 hover:border-slate-300 transition-all inline-flex items-center gap-1.5 shadow-sm"
+                          className="w-full sm:w-auto px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 hover:border-slate-300 transition-all inline-flex items-center justify-center gap-1.5 "
                         >
                           {showAllViolations ? "Show Less Events" : `Show All ${auditDetails.violations.length} Events`}
                         </button>
                       </div>
                     )}
-
-                   
                   </div>
                 )}
               </div>
@@ -542,27 +543,27 @@ export default function SessionAuditPage() {
 
         {/* ── Evidence Snapshots ────────────────────────────────────────── */}
         <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-          <div className="px-7 py-4 border-b border-slate-100 flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <EyeOff size={14} className="text-slate-400" />
-              <div>
+          <div className="px-4 py-3 sm:px-7 sm:py-4 border-b border-slate-100 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <EyeOff size={14} className="text-slate-400 flex-shrink-0" />
+              <div className="min-w-0">
                 <h3 className="text-sm font-bold text-slate-900">Evidence Snapshots</h3>
                 <p className="text-[10px] text-slate-400">Identity verification history</p>
               </div>
             </div>
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">
               {auditDetails.snapshots.length} Captures
             </span>
           </div>
-          
-          <div className="p-7">
+
+          <div className="p-4 sm:p-7">
             {auditDetails.snapshots.length === 0 ? (
               <div className="text-center py-10 text-slate-400 text-sm italic">
                 No snapshots captured during this session.
               </div>
             ) : (
               <div>
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
                   {(showAllSnapshots ? auditDetails.snapshots : auditDetails.snapshots.slice(0, 12)).map((s, idx) => (
                     <div key={idx} className="group relative">
                       <div className="aspect-video rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
@@ -574,12 +575,12 @@ export default function SessionAuditPage() {
                         {/* Status Badges */}
                         <div className="absolute top-1.5 right-1.5 flex flex-col gap-1">
                           {!s.face_matches && (
-                            <div className="bg-red-500 text-white p-1 rounded-md shadow-sm" title="Face Mismatch">
+                            <div className="bg-red-500 text-white p-1 rounded-md " title="Face Mismatch">
                               <Fingerprint size={10} />
                             </div>
                           )}
                           {s.multiple_faces && (
-                            <div className="bg-orange-500 text-white p-1 rounded-md shadow-sm" title="Multiple Faces">
+                            <div className="bg-orange-500 text-white p-1 rounded-md " title="Multiple Faces">
                               <Users size={10} />
                             </div>
                           )}
@@ -616,7 +617,7 @@ export default function SessionAuditPage() {
                   <div className="mt-6 flex justify-center">
                     <button
                       onClick={() => setShowAllSnapshots(!showAllSnapshots)}
-                      className="px-4 py-2 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-lg transition-colors duration-150"
+                      className="w-full sm:w-auto px-4 py-2 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-lg transition-colors duration-150"
                     >
                       {showAllSnapshots ? 'Show Less Captures' : `Show All ${auditDetails.snapshots.length} Captures`}
                     </button>
