@@ -6,8 +6,6 @@ Rules:
 - Must be idempotent: if an exam is already graded, it should gracefully return.
 """
 
-import logging
-from celery import Task
 from celery.utils.log import get_task_logger
 from sqlalchemy import select
 
@@ -30,26 +28,48 @@ logger = get_task_logger(__name__)
     name="src.worker.tasks.grading_tasks.grade_and_notify_task",
     max_retries=3,
     default_retry_delay=10,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_jitter=True,
     soft_time_limit=60,
     time_limit=120,
     queue="grading",
 )
 def grade_and_notify_task(self, session_uid: str) -> dict:
     """
-    Autograde an exam session and enqueue the result email.
+    Autograde a submitted exam session.
     
     Idempotency:
-    - If session is already submitted and scored, skip grading but optionally resend email
-      (we assume if it's queued again, we just want to ensure it's processed).
+    - If a submitted session is already scored, skip grading.
     """
     with self._session() as db:
         exam_session = db.execute(
-            select(ExamSession).where(ExamSession.uid == session_uid)
+            select(ExamSession)
+            .where(ExamSession.uid == session_uid)
+            .with_for_update()
         ).scalar_one_or_none()
 
         if not exam_session:
             logger.error(f"grade_and_notify_task: session {session_uid} not found")
             return {"error": "Session not found"}
+
+        if exam_session.status != ExamStatus.submitted:
+            logger.warning(
+                "grade_and_notify_task: session is not submitted",
+                extra={"session_uid": session_uid},
+            )
+            return {"error": "Session is not submitted"}
+
+        if exam_session.score is not None:
+            logger.info(
+                "grade_and_notify_task: session already graded",
+                extra={"session_uid": session_uid},
+            )
+            return {
+                "status": "already_graded",
+                "score": exam_session.score,
+                "percentage": exam_session.score_percentage,
+            }
 
         # Perform Autograding
         # 1. Fetch all questions for this exam
@@ -68,7 +88,10 @@ def grade_and_notify_task(self, session_uid: str) -> dict:
                 select(StudentAnswers).where(StudentAnswers.session_uid == exam_session.uid)
             ).scalars().all()
             
-            student_answers_map = {str(a.question_uid): a.selected_option_uids for a in student_answers_rows}
+            student_answers_map = {
+                str(answer.question_uid): answer
+                for answer in student_answers_rows
+            }
 
             earned_marks = 0
             total_possible_marks = sum(q.marks for q in questions)
@@ -80,10 +103,19 @@ def grade_and_notify_task(self, session_uid: str) -> dict:
                 ).scalars().all()
                 
                 correct_option_uids = [str(o.uid) for o in correct_options]
-                student_selected = student_answers_map.get(str(q.uid), [])
+                answer = student_answers_map.get(str(q.uid))
+                student_selected = answer.selected_option_uids if answer else []
+                is_correct = (
+                    bool(correct_option_uids)
+                    and set(student_selected) == set(correct_option_uids)
+                )
+
+                if answer:
+                    answer.is_correct = is_correct
+                    db.add(answer)
 
                 # Simple exact match check
-                if set(student_selected) == set(correct_option_uids) and len(correct_option_uids) > 0:
+                if is_correct:
                     earned_marks += q.marks
 
             exam_session.score = float(earned_marks)
@@ -92,10 +124,6 @@ def grade_and_notify_task(self, session_uid: str) -> dict:
             else:
                 exam_session.score_percentage = 0
 
-        # Mark as graded (status was likely set to submitted right before queuing this, but we ensure it)
-        if exam_session.status != ExamStatus.submitted:
-            exam_session.status = ExamStatus.submitted
-            
         db.add(exam_session)
         db.commit()
 

@@ -1,19 +1,18 @@
-from pydantic import BaseModel, field_validator
-from src.db.models import ExamEnrollment
+from pydantic import BaseModel, ConfigDict, field_validator
 from typing import Optional, List
 from uuid import UUID
 from datetime import datetime
 
 
 class StudentEnrollModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     first_name: str
     last_name: str
     student_id: str
     email: str
     device_id: Optional[str] = None
     ip_address: Optional[str] = None
-    embedding_vector: Optional[List[float]] = None
-    face_s3_url: Optional[str] = None
 
     @field_validator("student_id", mode="before")
     @classmethod
@@ -24,6 +23,8 @@ class StudentEnrollModel(BaseModel):
 
 
 class StudentEnrollResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     uid: UUID
     exam_uid: UUID
     first_name: str
@@ -32,15 +33,12 @@ class StudentEnrollResponse(BaseModel):
     email: str
     device_id: Optional[str]
     ip_address: Optional[str]
-    embedding_vector: Optional[List[float]]
-    face_s3_url: Optional[str]
     status: str
     enrolled_at: datetime
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    face_registration_token: str
 
 
 class FaceRegisterModel(BaseModel):
@@ -50,7 +48,9 @@ class FaceRegisterModel(BaseModel):
     and sends them all in a single request. The server quality-gates each
     image and averages the passing embeddings into one stored vector.
     """
-    enrollment_uid: UUID
+    model_config = ConfigDict(extra="forbid")
+
+    enrollment_token: str
     # Between 3 and 5 base64-encoded images. Client must send >= 3.
     face_images: List[str]
 
@@ -67,6 +67,7 @@ class FaceRegisterModel(BaseModel):
 class FaceRegisterResponse(BaseModel):
     message: str
     enrollment_uid: UUID
+    exam_uid: UUID
     face_registered: bool
     images_submitted: int
     images_passed_quality: int

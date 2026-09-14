@@ -5,6 +5,7 @@ from src.auth.dependencies import AccessTokenBearer
 from src.dependencies.roles import Role
 from .service import AnalyticsService
 from .schema import AnalyticsDashboardResponse
+from fastapi.exceptions import HTTPException
 
 analytics_router = APIRouter()
 analytics_service = AnalyticsService()
@@ -27,7 +28,15 @@ async def get_institution_analytics(
     institution_uid: str,
     session: AsyncSession = Depends(get_session),
     token_details: dict = Depends(access_token_bearer),
+    admin_only=Depends(role),
 ):
-    # Note: In a production app, we'd verify the admin owns this institution
-    analytics_data = await analytics_service.get_institution_analytics(session, institution_uid)
+    admin_uid = str(token_details["user"]["uid"])
+    analytics_data = await analytics_service.get_institution_analytics(
+        session, institution_uid, admin_uid
+    )
+    if analytics_data is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Institution not found or unauthorized",
+        )
     return analytics_data

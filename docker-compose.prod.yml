@@ -126,6 +126,18 @@ services:
     command: celery -A src.worker.celery_app worker --loglevel=info --queues=grading --pool=solo --concurrency=1
     logging: *default-logging
 
+  beat:
+    build: ./backend
+    image: examloc-api
+    container_name: examloc-beat
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    command: celery -A src.worker.celery_app beat --loglevel=info
+    logging: *default-logging
+
   worker-email:
     build: ./backend
     image: examloc-api

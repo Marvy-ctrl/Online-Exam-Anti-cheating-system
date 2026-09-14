@@ -26,9 +26,10 @@ from src.db.models import (
     Violation,
     ViolationType,
 )
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from src.db.models import Snapshot
 from src.core.storage import storage_service
+from src.core.crypto import decrypt_embedding
 import uuid
 logger = get_task_logger(__name__)
 
@@ -128,7 +129,14 @@ def verify_face_task(self, session_uid: str, enrollment_uid: str, live_image_bas
                 return {"face_match": False, "violation_logged": True, "distance": None}
 
         # --- Compare against stored embedding ---
-        stored_array = np.array(enrollment.embedding_vector)
+        try:
+            stored_array = np.array(decrypt_embedding(enrollment.embedding_vector))
+        except ValueError as exc:
+            logger.error(
+                "verify_face_task: embedding decryption failed",
+                extra={"enrollment_uid": enrollment_uid},
+            )
+            raise self.retry(exc=exc)
         distance = float(compute_distance(stored_array, live_embedding))
         face_match = distance < Config.FACE_SIMILARITY_THRESHOLD
 
@@ -147,7 +155,8 @@ def verify_face_task(self, session_uid: str, enrollment_uid: str, live_image_bas
             _record_violation(db, session_uid, enrollment_uid, ViolationType.face_mismatch, live_image_base64)
             return {"face_match": False, "violation_logged": True, "distance": distance}
 
-        _record_clean_snapshot(db, session_uid, enrollment_uid, live_image_base64)
+        # A successful match is transient verification data, not evidence.
+        # Do not retain clean frames; only violation frames are stored.
         return {"face_match": True, "violation_logged": False, "distance": distance}
 
 
@@ -211,91 +220,32 @@ def _record_violation(
             object_key = upload_res.get("object_key")
         except Exception as e:
             logger.error(
-                "Failed to upload snapshot, using inline fallback",
-                extra={"session_uid": session_uid, "error": str(e)},
+                "Failed to retain violation snapshot; violation event will remain",
+                extra={"session_uid": session_uid, "error": type(e).__name__},
             )
-            image_path = f"data:image/jpeg;base64,{live_image_base64[:50]}..."
-            object_key = None
-
-        new_snapshot = Snapshot(
-            uid=snapshot_uid,
-            student_uid=enrollment_uid,
-            session_uid=session_uid,
-            image_path=image_path,
-            object_key=object_key,
-            face_matches=(
-                violation_type not in (ViolationType.face_mismatch, ViolationType.no_face)
-            ),
-            multiple_faces_detected=(violation_type == ViolationType.multiple_faces),
-            timestamp=now,
-            violation_type=vtype_str,
-            occurrence_count=1,
-            last_seen_at=now,
-        )
-        db.add(new_snapshot)
+        else:
+            new_snapshot = Snapshot(
+                uid=snapshot_uid,
+                student_uid=enrollment_uid,
+                session_uid=session_uid,
+                image_path=image_path,
+                object_key=object_key,
+                face_matches=(
+                    violation_type
+                    not in (ViolationType.face_mismatch, ViolationType.no_face)
+                ),
+                multiple_faces_detected=(
+                    violation_type == ViolationType.multiple_faces
+                ),
+                timestamp=now,
+                violation_type=vtype_str,
+                occurrence_count=1,
+                last_seen_at=now,
+            )
+            db.add(new_snapshot)
 
     db.commit()
     logger.info(
         "violation recorded",
         extra={"session_uid": session_uid, "type": vtype_str},
     )
-
-
-def _record_clean_snapshot(
-    db: Session,
-    session_uid: str,
-    enrollment_uid: str,
-    live_image_base64: str,
-) -> None:
-    """Write a clean snapshot for the timeline (max 1 per minute)."""
-    now = datetime.now(timezone.utc)
-
-    # We only want 1 clean snapshot every 1 minute.
-    recent_clean = db.execute(
-        select(Snapshot).where(
-            Snapshot.session_uid == session_uid,
-            Snapshot.violation_type == None,
-            Snapshot.timestamp >= now - timedelta(seconds=30)
-        )
-    ).scalar_one_or_none()
-
-    if recent_clean:
-        return
-
-    snapshot_uid = uuid.uuid4()
-    try:
-        upload_res = storage_service.upload_snapshot(
-            session_uid=session_uid,
-            snapshot_uid=snapshot_uid,
-            base64_image=live_image_base64,
-        )
-        image_path = upload_res["image_path"]
-        object_key = upload_res.get("object_key")
-    except Exception as e:
-        logger.error(
-            "Failed to upload clean snapshot, using inline fallback",
-            extra={"session_uid": session_uid, "error": str(e)},
-        )
-        image_path = f"data:image/jpeg;base64,{live_image_base64[:50]}..."
-        object_key = None
-
-    new_snapshot = Snapshot(
-        uid=snapshot_uid,
-        student_uid=enrollment_uid,
-        session_uid=session_uid,
-        image_path=image_path,
-        object_key=object_key,
-        face_matches=True,
-        multiple_faces_detected=False,
-        timestamp=now,
-        violation_type=None,
-        occurrence_count=1,
-        last_seen_at=now,
-    )
-    db.add(new_snapshot)
-    db.commit()
-    logger.info(
-        "clean snapshot recorded",
-        extra={"session_uid": session_uid},
-    )
-

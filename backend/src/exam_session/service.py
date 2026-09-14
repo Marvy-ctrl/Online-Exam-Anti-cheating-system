@@ -27,6 +27,7 @@ from src.students.face_utils import decode_image, get_face_embedding, compute_di
 import logging
 import random
 from src.core.storage import storage_service
+from src.core.crypto import decrypt_embedding
 from src.auth.utils import decode_url_safe_token
 from itsdangerous import SignatureExpired, BadSignature
 
@@ -37,12 +38,101 @@ exam_service = ExamService()
 
 
 class ExamSessionService:
+    @staticmethod
+    def _resource_uuid(value: str, detail: str) -> UUID:
+        try:
+            return UUID(str(value))
+        except (TypeError, ValueError, AttributeError):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=detail,
+            )
+
+    async def get_owned_exam(
+        self, exam_uid: str, admin_uid: str, session: AsyncSession
+    ) -> Exam:
+        """Return an exam only when it belongs to the authenticated admin."""
+        exam_id = self._resource_uuid(exam_uid, "Exam not found")
+        admin_id = self._resource_uuid(admin_uid, "Exam not found")
+        statement = select(Exam).where(
+            Exam.uid == exam_id,
+            Exam.admin_uid == admin_id,
+        )
+        result = await session.exec(statement)
+        exam = result.first()
+
+        if not exam:
+            # Deliberately avoid revealing whether another admin owns this exam.
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Exam not found",
+            )
+
+        return exam
+
+    async def get_owned_session(
+        self, session_uid: str, admin_uid: str, session: AsyncSession
+    ) -> ExamSession:
+        """Return a session only when its exam belongs to the authenticated admin."""
+        exam_session_id = self._resource_uuid(session_uid, "Exam session not found")
+        admin_id = self._resource_uuid(admin_uid, "Exam session not found")
+        statement = (
+            select(ExamSession)
+            .join(Exam, ExamSession.exam_uid == Exam.uid)
+            .where(
+                ExamSession.uid == exam_session_id,
+                Exam.admin_uid == admin_id,
+            )
+        )
+        result = await session.exec(statement)
+        exam_session = result.first()
+
+        if not exam_session:
+            # Use one response for absent and foreign-owned sessions.
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Exam session not found",
+            )
+
+        return exam_session
+
+    async def get_student_session(
+        self,
+        session_uid: str,
+        exam_uid: str,
+        student_uid: str,
+        session: AsyncSession,
+        *,
+        for_update: bool = False,
+    ) -> ExamSession:
+        """Return only the session scoped to this signed student identity."""
+        exam_session_id = self._resource_uuid(session_uid, "Exam session not found")
+        exam_id = self._resource_uuid(exam_uid, "Exam session not found")
+        enrollment_id = self._resource_uuid(student_uid, "Exam session not found")
+        statement = select(ExamSession).where(
+            ExamSession.uid == exam_session_id,
+            ExamSession.exam_uid == exam_id,
+            ExamSession.student_uid == enrollment_id,
+        )
+        if for_update:
+            statement = statement.with_for_update()
+        result = await session.exec(statement)
+        exam_session = result.first()
+
+        if not exam_session:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Exam session not found",
+            )
+
+        return exam_session
+
     async def verify_live_face(
         self, live_image_base64: str, stored_embedding: List[float]
     ) -> bool:
         """
         Verify a single live image against the stored averaged enrollment embedding.
-        stored_embedding is a 128-d float array from the DB.
+        stored_embedding is a decrypted 128-d float array held only in memory.
         Uses Config.FACE_SIMILARITY_THRESHOLD — never a hardcoded value.
         """
         image_array = decode_image(live_image_base64)
@@ -89,10 +179,22 @@ class ExamSessionService:
                 detail="No face registered. Please complete face registration first.",
             )
 
+        try:
+            stored_embedding = decrypt_embedding(enrollment.embedding_vector)
+        except ValueError:
+            logger.exception(
+                "Stored face embedding could not be decrypted",
+                extra={"enrollment_uid": str(enrollment.uid)},
+            )
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Face verification is temporarily unavailable",
+            )
+
         # Perform live face verification
         face_match = await self.verify_live_face(
             live_image_base64=face_image_base64,
-            stored_embedding=enrollment.embedding_vector,
+            stored_embedding=stored_embedding,
         )
 
         if not face_match:
@@ -121,24 +223,11 @@ class ExamSessionService:
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Exam session already exists",
             )
-        # Log for debugging
-        print(f"DEBUG: Exam duration_minutes: {exam.duration_minutes}")
-        print(f"DEBUG: Exam title: {exam.title}")
 
         initial_expected_end_time = datetime.now(timezone.utc) + timedelta(
             minutes=exam.duration_minutes
         )
         expected_end_time = min(initial_expected_end_time, exam.end_time)
-
-        # min_remaining = (
-        #     expected_end_time - datetime.now(timezone.utc)
-        # ).total_seconds() / 60
-
-        print(f"DEBUG: Start time: {datetime.now(timezone.utc)}")
-        print(f"DEBUG: Expected end time: {expected_end_time}")
-        print(
-            f"DEBUG: Difference in minutes: {(expected_end_time - datetime.now(timezone.utc)).total_seconds() / 60}"
-        )
 
         new_session = ExamSession(
             student_uid=student_uid,
@@ -153,25 +242,34 @@ class ExamSessionService:
         await session.commit()
         await session.refresh(new_session)
 
+        logger.info(
+            "Exam session started",
+            extra={
+                "session_uid": str(new_session.uid),
+                "exam_uid": str(new_session.exam_uid),
+                "enrollment_uid": str(new_session.student_uid),
+                "expected_end_time": expected_end_time.isoformat(),
+            },
+        )
+
         return new_session, exam
 
     async def choose_options(
         self,
         exam_session_uid: str,
+        exam_uid: str,
         student_uid: str,
         question_uid: str,
         selected_option_uids: list[str],
         session: AsyncSession,
     ):
-        statement = select(ExamSession).where(ExamSession.uid == exam_session_uid)
-        result = await session.exec(statement)
-        exam_session = result.first()
-
-        if not exam_session:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Exam session not found",
-            )
+        exam_session = await self.get_student_session(
+            exam_session_uid,
+            exam_uid,
+            student_uid,
+            session,
+            for_update=True,
+        )
 
         if exam_session.status != ExamStatus.in_progress:
             raise HTTPException(
@@ -179,17 +277,13 @@ class ExamSessionService:
                 detail="Exam session is not active",
             )
 
-        statement = select(ExamEnrollment).where(
-            ExamEnrollment.uid == student_uid,
-            ExamEnrollment.exam_uid == exam_session.exam_uid,
-        )
-        result = await session.exec(statement)
-        enrollment = result.first()
-
-        if not enrollment:
+        if (
+            exam_session.expected_end_time is None
+            or datetime.now(timezone.utc) > exam_session.expected_end_time
+        ):
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Student is not enrolled for this exam",
+                status_code=status.HTTP_409_CONFLICT,
+                detail="The answer deadline has passed",
             )
 
         statement = select(Question).where(
@@ -204,6 +298,8 @@ class ExamSessionService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Question not found for this exam",
             )
+
+        if selected_option_uids:
             result = await session.exec(
                 select(Options).where(
                     Options.uid.in_(selected_option_uids),
@@ -219,7 +315,7 @@ class ExamSessionService:
 
         result = await session.exec(
             select(StudentAnswers).where(
-                StudentAnswers.session_uid == exam_session_uid,
+                StudentAnswers.session_uid == exam_session.uid,
                 StudentAnswers.question_uid == question_uid,
             )
         )
@@ -239,8 +335,8 @@ class ExamSessionService:
 
         else:
             new_answer = StudentAnswers(
-                session_uid=exam_session_uid,
-                question_uid=question_uid,
+                session_uid=exam_session.uid,
+                question_uid=question.uid,
                 selected_option_uids=selected_option_uids,
                 created_at=datetime.now(timezone.utc),
                 updated_at=datetime.now(timezone.utc),
@@ -255,25 +351,21 @@ class ExamSessionService:
                 "answer_uid": new_answer.uid,
             }
 
-    async def submit_exam(self, exam_uid: str, student_uid: str, session: AsyncSession):
+    async def submit_exam(
+        self,
+        session_uid: str,
+        exam_uid: str,
+        student_uid: str,
+        session: AsyncSession,
+    ):
 
-        exam = await exam_service.get_an_exam(exam_uid, session)
-        if not exam:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Exam not found"
-            )
-
-        session_statement = select(ExamSession).where(
-            ExamSession.student_uid == student_uid, ExamSession.exam_uid == exam_uid
+        exam_session = await self.get_student_session(
+            session_uid,
+            exam_uid,
+            student_uid,
+            session,
+            for_update=True,
         )
-        result = await session.exec(session_statement)
-        exam_session = result.first()
-
-        if not exam_session:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Exam session not found. Please start the exam first.",
-            )
 
         if exam_session.status == ExamStatus.submitted:
             raise HTTPException(
@@ -288,14 +380,16 @@ class ExamSessionService:
             )
 
         current_time = datetime.now(timezone.utc)
-
-        if current_time > exam_session.expected_end_time:
+        if exam_session.expected_end_time is None:
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Submission deadline has passed. Expected end time was {exam_session.expected_end_time.isoformat()}",
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Exam session has no completion deadline",
             )
 
-        exam_session.end_time = current_time
+        # The deadline is authoritative. If this request arrives just after it,
+        # finalize at the deadline instead of leaving the session in progress
+        # until the periodic reconciliation task runs.
+        exam_session.end_time = min(current_time, exam_session.expected_end_time)
         exam_session.status = ExamStatus.submitted
 
         # Commit so the background worker sees the submitted state
@@ -303,10 +397,18 @@ class ExamSessionService:
         await session.commit()
         await session.refresh(exam_session)
 
-        # Execute grading synchronously for immediate feedback
+        # Queue grading after the committed submission becomes visible to workers.
+        # If Redis is briefly unavailable, the periodic completion task will find
+        # this submitted-but-ungraded session and enqueue it again.
         from src.worker.tasks.grading_tasks import grade_and_notify_task
-        grade_and_notify_task.apply(args=(str(exam_session.uid),))
 
+        try:
+            grade_and_notify_task.delay(str(exam_session.uid))
+        except Exception:
+            logger.exception(
+                "Could not enqueue grading; periodic reconciliation will retry",
+                extra={"session_uid": str(exam_session.uid)},
+            )
 
         return exam_session
 
@@ -378,6 +480,7 @@ class ExamSessionService:
 
     async def get_exam_questions_for_student(
         self,
+        session_uid: str,
         exam_uid: str,
         student_uid: str,
         session: AsyncSession,
@@ -388,18 +491,9 @@ class ExamSessionService:
         student_uid = enrollment_uid (ExamEnrollment.uid)
         """
         # 1. Verify active session
-        session_stmt = select(ExamSession).where(
-            ExamSession.student_uid == student_uid,
-            ExamSession.exam_uid == exam_uid,
+        exam_session = await self.get_student_session(
+            session_uid, exam_uid, student_uid, session
         )
-        result = await session.exec(session_stmt)
-        exam_session = result.first()
-
-        if not exam_session:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="No active exam session found. Please start the exam first.",
-            )
 
         if exam_session.status == ExamStatus.submitted:
             raise HTTPException(
@@ -408,7 +502,7 @@ class ExamSessionService:
             )
 
         # 1.5 Fetch Exam settings
-        exam_stmt = select(Exam).where(Exam.uid == exam_uid)
+        exam_stmt = select(Exam).where(Exam.uid == exam_session.exam_uid)
         exam_result = await session.exec(exam_stmt)
         exam = exam_result.first()
         if not exam:
@@ -421,7 +515,7 @@ class ExamSessionService:
         from src.db.models import Options as OptionsModel
         questions_stmt = (
             select(Question)
-            .where(Question.exam_uid == exam_uid)
+            .where(Question.exam_uid == exam_session.exam_uid)
             .order_by(Question.order_index)
         )
         result = await session.exec(questions_stmt)
@@ -474,7 +568,7 @@ class ExamSessionService:
         # 5. Fetch saved answers for this session (reconnect recovery)
         from src.db.models import StudentAnswers as StudentAnswersModel
         answers_stmt = select(StudentAnswersModel).where(
-            StudentAnswersModel.session_uid == str(exam_session.uid)
+            StudentAnswersModel.session_uid == exam_session.uid
         )
         result = await session.exec(answers_stmt)
         saved = result.all()
@@ -485,7 +579,9 @@ class ExamSessionService:
 
         # 6. Fetch Student Identity
         from src.db.models import ExamEnrollment
-        enroll_stmt = select(ExamEnrollment).where(ExamEnrollment.uid == UUID(student_uid))
+        enroll_stmt = select(ExamEnrollment).where(
+            ExamEnrollment.uid == exam_session.student_uid
+        )
         res = await session.exec(enroll_stmt)
         enrollment = res.first()
 
@@ -502,31 +598,22 @@ class ExamSessionService:
  
     async def record_violation(
         self,
+        session_uid: str,
         exam_uid: str,
         student_uid: str,
         violation_type: str,
         metadata: dict,
         session: AsyncSession,
     ):
-        # 1. Get session (Try to be flexible with status)
-        print(f"DEBUG VIOLATION: student_uid={student_uid}, exam_uid={exam_uid}")
-        
-        # Ensure we are comparing UUID to UUID
-        s_uuid = UUID(student_uid) if isinstance(student_uid, str) else student_uid
-        e_uuid = UUID(exam_uid) if isinstance(exam_uid, str) else exam_uid
-
-        session_stmt = select(ExamSession).where(
-            ExamSession.student_uid == s_uuid,
-            ExamSession.exam_uid == e_uuid,
+        exam_session = await self.get_student_session(
+            session_uid, exam_uid, student_uid, session
         )
-        result = await session.exec(session_stmt)
-        exam_session = result.first()
-        
-        if not exam_session:
-            print(f"❌ DATABASE ERROR: No session found for student {student_uid} in exam {exam_uid}")
-            return
 
-        print(f"✅ Found session {exam_session.uid} (Status: {exam_session.status})")
+        if exam_session.status != ExamStatus.in_progress:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Exam session is not active",
+            )
 
         # 2. Record violation
         # Map frontend strings to backend Enum
@@ -541,7 +628,7 @@ class ExamSessionService:
         
         new_violation = Violation(
             uid=uuid.uuid4(),
-            student_uid=UUID(student_uid),
+            student_uid=exam_session.student_uid,
             session_uid=exam_session.uid,
             violation_type=v_type.value if hasattr(v_type, 'value') else v_type, 
             timestamp=datetime.now(timezone.utc),
@@ -549,30 +636,32 @@ class ExamSessionService:
         session.add(new_violation)
         await session.flush()
         await session.commit()
-        print(f"VIOLATION SAVED: {v_type} for session {exam_session.uid}")
-        print(f" Logged {v_type.value} for session {exam_session.uid}")
+        logger.info(
+            "Violation saved",
+            extra={"violation_type": v_type.value, "session_uid": str(exam_session.uid)},
+        )
 
     async def verify_face_loop(
         self,
+        session_uid: str,
         exam_uid: str,
         student_uid: str,
         live_image_base64: str,
         session: AsyncSession,
     ):
-        # 1. Get enrollment and session to ensure they exist and are valid
-        enrollment_stmt = select(ExamEnrollment).where(ExamEnrollment.uid == student_uid)
+        # 1. Bind both enrollment and active session to the signed token scope.
+        exam_session = await self.get_student_session(
+            session_uid, exam_uid, student_uid, session
+        )
+
+        enrollment_stmt = select(ExamEnrollment).where(
+            ExamEnrollment.uid == exam_session.student_uid,
+            ExamEnrollment.exam_uid == exam_session.exam_uid,
+        )
         result = await session.exec(enrollment_stmt)
         enrollment = result.first()
 
-        session_stmt = select(ExamSession).where(
-            ExamSession.student_uid == student_uid,
-            ExamSession.exam_uid == exam_uid,
-            ExamSession.status == ExamStatus.in_progress,
-        )
-        result = await session.exec(session_stmt)
-        exam_session = result.first()
-
-        if not enrollment or not exam_session:
+        if not enrollment or exam_session.status != ExamStatus.in_progress:
             raise HTTPException(404, "Active session not found")
 
         # 2. Dispatch the Heavy Face Inference to Celery
@@ -656,18 +745,18 @@ class ExamSessionService:
         }
 
     async def update_session_score(
-        self, session_uid: str, new_score: float, reason: str, session: AsyncSession
+        self,
+        session_uid: str,
+        new_score: float,
+        reason: str,
+        admin_uid: str,
+        session: AsyncSession,
     ):
         """
         Manually update a student's score and record the reason.
         """
         from src.db.models import Question
-        statement = select(ExamSession).where(ExamSession.uid == UUID(session_uid))
-        result = await session.exec(statement)
-        exam_session = result.first()
-
-        if not exam_session:
-            raise HTTPException(404, "Exam session not found")
+        exam_session = await self.get_owned_session(session_uid, admin_uid, session)
 
         # Fetch exam for total questions to update percentage
         exam_stmt = select(Question).where(Question.exam_uid == exam_session.exam_uid)
@@ -685,15 +774,19 @@ class ExamSessionService:
         await session.refresh(exam_session)
         return exam_session
 
-    async def get_exam_results(self, exam_uid: str, session: AsyncSession):
+    async def get_exam_results(
+        self, exam_uid: str, admin_uid: str, session: AsyncSession
+    ):
         """
         Fetch all sessions for an exam with student details and violation counts.
         """
         from sqlalchemy import func
         from src.db.models import Violation
 
+        owned_exam = await self.get_owned_exam(exam_uid, admin_uid, session)
+
         # Get total marks
-        q_stmt = select(func.sum(Question.marks)).where(Question.exam_uid == UUID(exam_uid))
+        q_stmt = select(func.sum(Question.marks)).where(Question.exam_uid == owned_exam.uid)
         q_res = await session.exec(q_stmt)
         total_marks = q_res.first() or 0
 
@@ -701,7 +794,7 @@ class ExamSessionService:
         stmt = (
             select(ExamSession, ExamEnrollment)
             .join(ExamEnrollment, ExamSession.student_uid == ExamEnrollment.uid)
-            .where(ExamSession.exam_uid == UUID(exam_uid))
+            .where(ExamSession.exam_uid == owned_exam.uid)
         )
         result = await session.exec(stmt)
         rows = result.all()
@@ -751,16 +844,20 @@ class ExamSessionService:
 
         return out
 
-    async def get_session_details(self, session_uid: str, session: AsyncSession):
+    async def get_session_details(
+        self, session_uid: str, admin_uid: str, session: AsyncSession
+    ):
         """
         Fetch full details for a specific session, including all violations with timestamps.
         """
+
+        owned_session = await self.get_owned_session(session_uid, admin_uid, session)
 
         # 1. Fetch Session & Enrollment
         stmt = (
             select(ExamSession, ExamEnrollment)
             .join(ExamEnrollment, ExamSession.student_uid == ExamEnrollment.uid)
-            .where(ExamSession.uid == UUID(session_uid))
+            .where(ExamSession.uid == owned_session.uid)
         )
         result = await session.exec(stmt)
         row = result.first()
@@ -775,11 +872,15 @@ class ExamSessionService:
         v_res = await session.exec(v_stmt)
         violations = v_res.all()
         
-        # 3. Fetch Snapshots (only recent ones; anything older than 7 days is purged from storage)
-        seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
+        # 3. Fetch retained violation evidence only. Clean frames are not evidence,
+        # and expired rows remain hidden even if cleanup has not run yet.
+        retention_cutoff = datetime.now(timezone.utc) - timedelta(
+            days=Config.SNAPSHOT_RETENTION_DAYS
+        )
         s_stmt = select(Snapshot).where(
             Snapshot.session_uid == exam_session.uid,
-            Snapshot.timestamp >= seven_days_ago
+            Snapshot.violation_type.is_not(None),
+            Snapshot.timestamp > retention_cutoff,
         ).order_by(Snapshot.timestamp)
         s_res = await session.exec(s_stmt)
         snapshots = s_res.all()
@@ -811,15 +912,7 @@ class ExamSessionService:
             ],
             "snapshots": [
                 {
-                    "url": (
-                        storage_service.generate_presigned_url(s.object_key)
-                        if s.object_key
-                        else (
-                            f"{Config.DOMAIN}{s.image_path}"
-                            if s.image_path.startswith("/")
-                            else s.image_path
-                        )
-                    ),
+                    "url": f"{Config.DOMAIN}/api/v1/exam_session/storage/snapshot/{s.session_uid}/{s.uid}",
                     "face_matches": s.face_matches,
                     "multiple_faces": s.multiple_faces_detected,
                     "time": s.timestamp.isoformat() if s.timestamp else None,
@@ -829,4 +922,3 @@ class ExamSessionService:
                 } for s in snapshots
             ]
         }
-

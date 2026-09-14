@@ -39,6 +39,19 @@ class ExamService:
     async def create_subject(
         self, subject_name: SubjectCreateModel, admin_uid: str, session: AsyncSession
     ):
+        from src.db.models import Institution
+
+        institution = (
+            await session.exec(
+                select(Institution).where(
+                    Institution.uid == subject_name.institution_uid,
+                    Institution.admin_uid == admin_uid,
+                )
+            )
+        ).first()
+        if not institution:
+            return None
+
         subject_dict = subject_name.model_dump()
         new_subject = Subject(**subject_dict)
         session.add(new_subject)
@@ -97,10 +110,16 @@ class ExamService:
         result = await session.exec(statement)
         return result.first()
 
-    async def get_exam_with_subject(self, exam_uid: str, session: AsyncSession):
+    async def get_exam_with_subject(
+        self, exam_uid: str, admin_uid: str, session: AsyncSession
+    ):
         """Fetch a single exam and eagerly load its subject name for the frontend detail view."""
         from src.db.models import Exam, Subject
-        statement = select(Exam, Subject).join(Subject, Exam.subject_uid == Subject.uid, isouter=True).where(Exam.uid == exam_uid)
+        statement = (
+            select(Exam, Subject)
+            .join(Subject, Exam.subject_uid == Subject.uid, isouter=True)
+            .where(Exam.uid == exam_uid, Exam.admin_uid == admin_uid)
+        )
         result = (await session.exec(statement)).first()
         if result:
             exam, subject = result
@@ -127,10 +146,11 @@ class ExamService:
         self,
         student_details: StudentPreEnrollModel,
         exam_uid: str,
+        admin_uid: str,
         session: AsyncSession,
         raise_on_duplicate: bool = False,
     ):
-        exam = await self.get_an_exam(exam_uid, session)
+        exam = await self.get_exam_owned_by(exam_uid, admin_uid, session)
         if not exam:
             return None
 
@@ -214,11 +234,17 @@ class ExamService:
         self,
         bulk_data: BulkPreEnrollModel,
         exam_uid: str,
+        admin_uid: str,
         session: AsyncSession,
     ):
+        if not await self.get_exam_owned_by(exam_uid, admin_uid, session):
+            return None
+
         results = []
         for student_info in bulk_data.students:
-            enrolled = await self.pre_enroll_students(student_info, exam_uid, session)
+            enrolled = await self.pre_enroll_students(
+                student_info, exam_uid, admin_uid, session
+            )
             if enrolled:
                 results.append(enrolled)
         return results
@@ -226,6 +252,30 @@ class ExamService:
     async def create_exam(
         self, exam: ExamCreateModel, admin_uid: str, session: AsyncSession
     ):
+        from src.db.models import Institution
+
+        institution = (
+            await session.exec(
+                select(Institution).where(
+                    Institution.uid == exam.institution_uid,
+                    Institution.admin_uid == admin_uid,
+                )
+            )
+        ).first()
+        if not institution:
+            return None
+
+        subject = (
+            await session.exec(
+                select(Subject).where(
+                    Subject.uid == exam.subject_uid,
+                    Subject.institution_uid == institution.uid,
+                )
+            )
+        ).first()
+        if not subject:
+            return None
+
         exam_dict = exam.model_dump()
         # admin_uid is always set from the authenticated token, never from client input.
         exam_dict["admin_uid"] = UUID(admin_uid)
@@ -339,25 +389,36 @@ class ExamService:
         await session.commit()
         return True
 
-    async def bulk_remove_students_from_exam(self, session: AsyncSession, exam_uid: str, student_uids: list[str], admin_uid: str):
+    async def bulk_remove_students_from_exam(
+        self,
+        session: AsyncSession,
+        exam_uid: str,
+        student_uids: list[UUID],
+        admin_uid: str,
+    ):
         from src.db.models import ExamEnrollment
-        # Verify exam ownership first
+
         exam = await self.get_exam_owned_by(exam_uid, admin_uid, session)
         if not exam:
             return False
-            
+
+        requested_ids = set(student_uids)
         statement = select(ExamEnrollment).where(
             and_(
-                ExamEnrollment.exam_uid == exam_uid, 
-                ExamEnrollment.uid.in_(student_uids)
+                ExamEnrollment.exam_uid == exam_uid,
+                ExamEnrollment.uid.in_(requested_ids),
             )
         )
         result = await session.exec(statement)
         enrollments = result.all()
-        
+
+        # Avoid silently applying only part of a malformed or stale batch.
+        if {enrollment.uid for enrollment in enrollments} != requested_ids:
+            return False
+
         for enrollment in enrollments:
             await session.delete(enrollment)
-            
+
         await session.commit()
         return True
 
@@ -396,4 +457,3 @@ class ExamService:
         )
         result = await session.exec(statement)
         return exam, result.all()
-

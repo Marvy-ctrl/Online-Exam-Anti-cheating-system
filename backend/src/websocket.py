@@ -1,6 +1,10 @@
 from fastapi import WebSocket
-from typing import Dict, List, Set
+from typing import Dict, List
 import json
+from src.core.logger import get_logger
+
+
+logger = get_logger(__name__)
 
 class ConnectionManager:
     def __init__(self):
@@ -14,7 +18,11 @@ class ConnectionManager:
         if student_uid not in self.active_student_connections:
             self.active_student_connections[student_uid] = []
         self.active_student_connections[student_uid].append(websocket)
-        print(f"Student {student_uid} connected. Active: {len(self.active_student_connections[student_uid])}")
+        logger.info(
+            "Student websocket connected",
+            student_uid=student_uid,
+            active_connections=len(self.active_student_connections[student_uid]),
+        )
 
     def disconnect_student(self, websocket: WebSocket, student_uid: str):
         if student_uid in self.active_student_connections:
@@ -22,14 +30,14 @@ class ConnectionManager:
                 self.active_student_connections[student_uid].remove(websocket)
             if not self.active_student_connections[student_uid]:
                 del self.active_student_connections[student_uid]
-        print(f"Student {student_uid} disconnected")
+        logger.info("Student websocket disconnected", student_uid=student_uid)
 
     async def connect_monitor(self, websocket: WebSocket, exam_uid: str):
         await websocket.accept()
         if exam_uid not in self.exam_monitors:
             self.exam_monitors[exam_uid] = []
         self.exam_monitors[exam_uid].append(websocket)
-        print(f"Monitor joined exam {exam_uid}")
+        logger.info("Exam monitor connected", exam_uid=exam_uid)
 
     def disconnect_monitor(self, websocket: WebSocket, exam_uid: str):
         if exam_uid in self.exam_monitors:
@@ -37,31 +45,43 @@ class ConnectionManager:
                 self.exam_monitors[exam_uid].remove(websocket)
             if not self.exam_monitors[exam_uid]:
                 del self.exam_monitors[exam_uid]
-        print(f"Monitor left exam {exam_uid}")
+        logger.info("Exam monitor disconnected", exam_uid=exam_uid)
 
     async def notify_monitor(self, exam_uid: str, data: dict):
         """Send violation or status update to examiners watching this exam"""
         if exam_uid in self.exam_monitors:
-            print(f"📡 Broadcasting to {len(self.exam_monitors[exam_uid])} monitors for exam {exam_uid}")
+            logger.debug(
+                "Broadcasting exam update",
+                exam_uid=exam_uid,
+                monitor_count=len(self.exam_monitors[exam_uid]),
+            )
             disconnected = []
             for connection in self.exam_monitors[exam_uid]:
                 try:
                     await connection.send_text(json.dumps(data))
-                except Exception as e:
-                    print(f"❌ Failed to send to monitor: {e}")
+                except Exception as exc:
+                    logger.warning(
+                        "Exam monitor delivery failed",
+                        exam_uid=exam_uid,
+                        error_type=type(exc).__name__,
+                    )
                     disconnected.append(connection)
             
             for conn in disconnected:
                 self.disconnect_monitor(conn, exam_uid)
         else:
-            print(f"⚠️ No active monitors for exam {exam_uid}")
+            logger.debug("No active monitors for exam update", exam_uid=exam_uid)
 
     async def send_to_student(self, student_uid: str, message: str):
         if student_uid in self.active_student_connections:
             for connection in self.active_student_connections[student_uid]:
                 try:
                     await connection.send_text(message)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.warning(
+                        "Student websocket delivery failed",
+                        student_uid=student_uid,
+                        error_type=type(exc).__name__,
+                    )
 
 manager = ConnectionManager()

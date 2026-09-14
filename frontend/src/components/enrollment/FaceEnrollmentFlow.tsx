@@ -16,13 +16,13 @@ export interface FaceEnrollmentSuccessData {
 }
 
 interface FaceEnrollmentFlowProps {
-  enrollmentUid: string;
+  enrollmentToken: string;
   onSuccess: (data: FaceEnrollmentSuccessData) => void;
   onError: (msg: string) => void;
 }
 
 export function FaceEnrollmentFlow({
-  enrollmentUid,
+  enrollmentToken,
   onSuccess,
   onError,
 }: FaceEnrollmentFlowProps) {
@@ -72,6 +72,27 @@ export function FaceEnrollmentFlow({
   useEffect(() => {
     let isMounted = true;
 
+    const startCamera = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: "user",
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+          },
+        });
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+        setErrorMsg(null);
+      } catch {
+        const message = "Unable to access camera. Please allow camera permissions.";
+        setErrorMsg(message);
+        onError(message);
+      }
+    };
+
     const init = async () => {
       try {
         setLoading(true);
@@ -108,29 +129,7 @@ export function FaceEnrollmentFlow({
         clearTimeout(timeoutRef.current);
       }
     };
-  }, []);
-
-  const startCamera = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: "user",
-          width: { ideal: 640 },
-          height: { ideal: 480 },
-        },
-      });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
-      setErrorMsg(null);
-    } catch (err) {
-      console.error("Camera error:", err);
-      const msg = "Unable to access camera. Please allow camera permissions.";
-      setErrorMsg(msg);
-      onError(msg);
-    }
-  };
+  }, [onError]);
 
   const stopCamera = () => {
     if (streamRef.current) {
@@ -255,7 +254,7 @@ export function FaceEnrollmentFlow({
       } else {
         setStatusText("No face detected. Please face the camera.");
       }
-    } catch (e) {
+    } catch {
       // Ignore occasional detection errors
     }
 
@@ -313,7 +312,7 @@ export function FaceEnrollmentFlow({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          enrollment_uid: enrollmentUid,
+          enrollment_token: enrollmentToken,
           face_images: images,
         }),
       });
@@ -327,7 +326,7 @@ export function FaceEnrollmentFlow({
         setErrorMsg(msg);
         onError(msg);
       }
-    } catch (err) {
+    } catch {
       const msg = "Network error. Please check your connection and try again.";
       setErrorMsg(msg);
       onError(msg);

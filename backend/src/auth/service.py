@@ -4,8 +4,10 @@ from src.db.models import Admin
 from .schema import UserCreateModel
 from .utils import hash_password
 from src.dependencies.roles import Role
+from src.core.logger import get_logger
 
 role = Role(["admin"])
+logger = get_logger(__name__)
 
 
 class UserService:
@@ -19,8 +21,8 @@ class UserService:
         session.add(new_user)
 
         await session.commit()
-        await session.refresh(new_user) 
-        print("✅ USER SAVED:", new_user.email, new_user.uid)
+        await session.refresh(new_user)
+        logger.info("Administrator account created", user_uid=str(new_user.uid))
         return new_user
 
     async def get_user_by_email(self, email: str, session: AsyncSession):

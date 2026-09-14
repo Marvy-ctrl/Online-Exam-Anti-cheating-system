@@ -147,13 +147,25 @@ docker compose -f docker-compose.prod.yml ps
 docker compose -f docker-compose.prod.yml logs -f api
 ```
 
-Tables are created automatically by `init_db()` on startup.
+Tables are created automatically by `init_db()` on startup, but existing columns are
+changed only by Alembic. The single authoritative migration configuration lives in
+`backend/alembic.ini` and is included in the API image.
 
-> **Do not run `alembic upgrade head`.** Migration `75e4d7607466` converts
-> `enrollment.embedding_vector` from `ARRAY(Float)` to `TEXT`, while `models.py` still
-> declares it as `ARRAY(Float)`. Applying it breaks face enrollment (writes fail on a
-> `$1::FLOAT[]` cast) and face verification (reads deserialize into a list of single
-> characters). The schema you need is already created by `create_all`.
+Before the first v2 deployment, take a database backup. Databases previously managed
+only by `create_all()` have no Alembic revision marker, so baseline them at the last
+legacy schema revision and then run the encryption migration:
+
+```bash
+docker compose -f docker-compose.prod.yml build api
+docker compose -f docker-compose.prod.yml run --rm api alembic stamp b94c987f123b
+docker compose -f docker-compose.prod.yml run --rm api alembic upgrade head
+docker compose -f docker-compose.prod.yml up -d
+```
+
+Do not run `stamp` on a database that already reports an Alembic revision; use
+`alembic current` first. Migration `c7f2a9d4e6b1` encrypts existing `FLOAT[]`
+embeddings into authenticated `TEXT` ciphertext without requiring re-enrollment. It
+is also safe when a fresh database already has the current `TEXT` column.
 
 Verify locally on the box before exposing it:
 
@@ -278,29 +290,24 @@ Cookies to confirm in DevTools → Application → Cookies: `access_token` shoul
 
 ## 9. Before real students touch this
 
-The audit found **eight unauthenticated endpoints**. On localhost they were latent;
-on a public domain they are live. Most consequential:
+The v2 hardening pass now protects score changes, results, session details, webcam
+evidence, and the examiner monitoring WebSocket with authentication, role checks,
+and exam ownership checks. Local snapshot fallback files are served only through
+the protected evidence endpoint; there is no public `/static` mount.
 
-- `POST /api/v1/exam_session/session/{uid}/update-score` — anyone can overwrite any score
-- `GET /api/v1/exam_session/{exam_uid}/results` — leaks every session UID and score, no auth
-- `GET /api/v1/exam_session/session/{uid}/details` — full forensic log incl. snapshot URLs
-- `GET /api/v1/exam_session/storage/snapshot/{uid}/{file}` — serves stored webcam JPEGs
-- `WS /api/v1/exam_session/{exam_uid}/monitor/ws` — live violation feed, zero auth
-- `GET /static/snapshots/...` — `__init__.py:61` mounts `backend/uploads` as a public
-  static directory. When a MinIO upload fails, `storage.py` falls back to writing the
-  JPEG there, and those files are then served with no auth and no 7-day expiry — they
-  bypass even the (already unauthenticated) API proxy above. Directory listing is off,
-  so a UID must be known, but the `/details` endpoint hands those out freely.
+Operational requirements and remaining capacity work:
 
-These chain: one `exam_uid` unrolls into every student's grades and webcam
-photographs. **Use synthetic data and your own face only** until they're fixed.
-
-Also outstanding for this deployment:
 - No rate limiting on `/auth/login` — unthrottled bcrypt.
-- No server-side auto-submit backstop: a student who disconnects at the deadline is
-  left `in_progress` and ungraded forever, with no admin recovery path.
-- Grading runs synchronously via `.apply()` (`exam_session/service.py:308`), so
-  `worker-grading` idles. One-word fix to `.delay()`.
+- Celery Beat now checks once per minute for overdue `in_progress` sessions, records
+  their authoritative deadline as the completion time, and queues grading. It also
+  recovers submitted sessions whose original grading dispatch was interrupted.
+- Submission queues grading with `.delay()`, so the API can return without running
+  the grader in the request process. Keep both `worker-grading` and `beat` running.
+- Successful face-verification frames are never retained. The first frame for each
+  violation type is retained as review evidence, while repeat events increment its
+  occurrence count. Beat purges evidence rows and files after
+  `SNAPSHOT_RETENTION_DAYS` (seven days by default); MinIO lifecycle expiry provides
+  a second deletion layer.
 - Face worker is `--pool=solo --concurrency=1`: ~23 concurrent students before the
   queue grows unbounded.
 - Keep the API at **one** uvicorn worker. `ConnectionManager` stores sockets in

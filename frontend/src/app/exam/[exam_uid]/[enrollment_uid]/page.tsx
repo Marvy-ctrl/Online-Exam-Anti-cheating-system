@@ -1,807 +1,237 @@
-"use client"
-import React, { useCallback, useEffect, useRef, useState } from 'react'
-import Image from 'next/image'
-import { useParams, useRouter } from 'next/navigation'
-import { AlertTriangle, CheckCircle, Clock, Loader2, Menu, Send, ShieldAlert, X } from 'lucide-react'
+'use client'
 
-const BASE_URL = `${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"}/api/v1`
-
-interface Option { uid: string; option_text: string; order_index: number }
-interface Question { uid: string; question_text: string; order_index: number; options: Option[] }
-interface ExamData {
-  exam_uid: string; session_uid: string
-  questions: Question[]
-  student_first_name: string
-  student_last_name: string
-  student_id: string
-  saved_answers: Record<string, string[]>
-  expected_end_time?: string
-}
-
-type AnswerState = Record<string, string>   // question_uid → selected option_uid
-type SaveStatus = 'idle' | 'saving' | 'error'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useParams } from 'next/navigation'
+import { ExamHeader } from '@/src/components/exam/ExamHeader'
+import {
+  ExamLoadError,
+  ExamLoading,
+  ExamSubmitted,
+  SubmitModal,
+  ViolationBanner,
+} from '@/src/components/exam/ExamOverlays'
+import {
+  MobileMonitorStrip,
+  ProctoringSidebar,
+} from '@/src/components/exam/ProctoringPanels'
+import { QuestionDisplay } from '@/src/components/exam/QuestionDisplay'
+import { QuestionNavigator } from '@/src/components/exam/QuestionNavigator'
+import {
+  restoreSavedAnswers,
+  useAnswerSync,
+} from '@/src/hooks/exam/useAnswerSync'
+import { useBrowserViolations } from '@/src/hooks/exam/useBrowserViolations'
+import { useExamTimer } from '@/src/hooks/exam/useExamTimer'
+import { useExamWebSocket } from '@/src/hooks/exam/useExamWebSocket'
+import { useWebcamMonitor } from '@/src/hooks/exam/useWebcamMonitor'
+import { examSessionUrl } from '@/src/lib/exam-api'
+import type { ExamData, ExamIdentity } from '@/src/types/exam'
 
 export default function ExamPage() {
-  const params = useParams()
-  const router = useRouter()
-  const { exam_uid, enrollment_uid } = params as { exam_uid: string; enrollment_uid: string }
-
-  useEffect(() => {
-    console.log("🚀 ExamPage Mounted")
-    console.log("📍 BASE_URL:", BASE_URL)
-    console.log("🆔 Exam UID:", exam_uid)
-    console.log("🆔 Enrollment UID:", enrollment_uid)
-  }, [])
+  const { exam_uid: examUid, enrollment_uid: enrollmentUid } = useParams<{
+    exam_uid: string
+    enrollment_uid: string
+  }>()
+  const identity: ExamIdentity = useMemo(
+    () => ({ examUid, enrollmentUid }),
+    [examUid, enrollmentUid],
+  )
 
   const [loading, setLoading] = useState(true)
   const [examData, setExamData] = useState<ExamData | null>(null)
-  const [answers, setAnswers] = useState<AnswerState>({})
-  const [currentIdx, setCurrentIdx] = useState(0)
-  const [saveStatus, setSaveStatus] = useState<Record<string, SaveStatus>>({})
+  const [currentIndex, setCurrentIndex] = useState(0)
   const [error, setError] = useState('')
-
-  // Timer
-  const [timeLeft, setTimeLeft] = useState<number | null>(null)  // seconds
-  const expectedEndRef = useRef<Date | null>(null)
-
-  // Submit
-  const [showSubmitModal, setShowSubmitModal] = useState(false)
+  const [violationBanner, setViolationBanner] = useState('')
+  const [navigatorOpen, setNavigatorOpen] = useState(false)
+  const [submitModalOpen, setSubmitModalOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [submittedAt, setSubmittedAt] = useState('')
 
-  // Webcam
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const desktopVideoRef = useRef<HTMLVideoElement>(null)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [webcamStream, setWebcamStream] = useState<MediaStream | null>(null)
-  const [faceStatus, setFaceStatus] = useState<'ok' | 'warning' | 'checking'>('checking')
-  const [nextCheckIn, setNextCheckIn] = useState(60)
-  const faceCheckInterval = useRef<NodeJS.Timeout | null>(null)
-  const faceCheckCountdown = useRef<NodeJS.Timeout | null>(null)
-
-  // Violations
-  const [violationBanner, setViolationBanner] = useState('')
-  const tabSwitchCount = useRef(0)
-
-  // WebSocket State
-  const wsRef = useRef<WebSocket | null>(null)
-  const [wsConnected, setWsConnected] = useState(false)
-
-  // Mobile nav drawer
-  const [navDrawerOpen, setNavDrawerOpen] = useState(false)
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const res = await fetch(
-          `${BASE_URL}/exam_session/${exam_uid}/student/${enrollment_uid}/questions`,
-          { credentials: 'include' }
-        )
-        if (res.status === 409) {
-          setSubmitted(true)
-          setLoading(false)
-          return
-        }
-        if (!res.ok) {
-          const err = await res.json()
-          setError(err.detail || 'Failed to load exam.')
-          setLoading(false)
-          return
-        }
-        const data: ExamData = await res.json()
-        setExamData(data)
-
-        // Restore saved answers
-        const restored: AnswerState = {}
-        for (const [qUid, optUids] of Object.entries(data.saved_answers)) {
-          if (optUids.length > 0) restored[qUid] = optUids[0]
-        }
-        setAnswers(restored)
-
-        // Fetch session expected_end_time
-        await fetchSessionTiming(data.session_uid, data.expected_end_time)
-      } catch (e) {
-        setError('Failed to connect to the exam server.')
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchData()
-  }, [exam_uid, enrollment_uid])
-
-  const fetchSessionTiming = async (sessionUid: string, serverExpectedEndTime?: string) => {
-    if (serverExpectedEndTime) {
-      expectedEndRef.current = new Date(serverExpectedEndTime)
-      return
-    }
-    // Fallback to sessionStorage
-    const stored = sessionStorage.getItem(`exam_end_${exam_uid}_${enrollment_uid}`)
-    if (stored) {
-      expectedEndRef.current = new Date(stored)
-    }
-  }
-
-  // ─── Timer ───────────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!expectedEndRef.current) return
-    const tick = () => {
-      const remaining = Math.max(0, Math.floor((expectedEndRef.current!.getTime() - Date.now()) / 1000))
-      setTimeLeft(remaining)
-      if (remaining === 0) {
-        triggerAutoSubmit()
-      }
-    }
-    tick()
-    const id = setInterval(tick, 1000)
-    return () => clearInterval(id)
-  }, [examData])
-
-  const triggerAutoSubmit = useCallback(async () => {
-    if (submitted || isSubmitting) return
-    await submitExam()
-  }, [submitted, isSubmitting])
-
-  // ─── WebSocket Monitoring Connection ────────────────────────────────────
-  useEffect(() => {
-    if (!examData || submitted) return
-
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const host = process.env.NEXT_PUBLIC_BACKEND_URL 
-      ? process.env.NEXT_PUBLIC_BACKEND_URL.replace('http://', '').replace('https://', '')
-      : 'localhost:8000'
-    const wsUrl = `${protocol}//${host}/api/v1/exam_session/${exam_uid}/student/${enrollment_uid}/ws`
-    
-    console.log("Monitoring system connecting to:", wsUrl)
-    const ws = new WebSocket(wsUrl)
-    wsRef.current = ws
-
-    ws.onopen = () => {
-      setWsConnected(true)
-      ws.send(JSON.stringify({ type: 'heartbeat', timestamp: new Date().toISOString() }))
-    }
-    ws.onclose = () => setWsConnected(false)
-    ws.onerror = (e) => console.error("WS Connection Error", e)
-
-    return () => ws.close()
-  }, [examData, submitted, exam_uid, enrollment_uid])
-
-  const sendWsViolation = (type: string, message: string) => {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({
-        type: 'violation',
-        violation_type: type,
-        message,
-        timestamp: new Date().toISOString()
-      }))
-    }
-  }
-
-  // ─── Webcam ──────────────────────────────────────────────────────────────
-  // Effect 1: acquire the media stream (independent of DOM)
-  useEffect(() => {
-    const acquire = async () => {
-      try {
-        const ms = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'user', width: 320, height: 240 },
-        })
-        setWebcamStream(ms)
-      } catch {
-        setViolationBanner('Camera not accessible. Continuous monitoring disabled.')
-      }
-    }
-    acquire()
-    return () => stopWebcam()
+  const { answers, saveStatus, selectOption, setAnswers } = useAnswerSync(identity)
+  const monitoringEnabled = Boolean(examData) && !submitted
+  const { connected, sendViolation } = useExamWebSocket(
+    identity,
+    monitoringEnabled,
+  )
+  const showCameraUnavailable = useCallback(() => {
+    setViolationBanner('Camera not accessible. Continuous monitoring disabled.')
   }, [])
+  const {
+    canvasRef,
+    desktopVideoRef,
+    faceStatus,
+    mobileVideoRef,
+    nextCheckIn,
+    stopWebcam,
+  } = useWebcamMonitor({
+    enabled: monitoringEnabled,
+    identity,
+    onCameraUnavailable: showCameraUnavailable,
+    sendViolation,
+  })
 
-  // Effect 2: attach stream to the <video> elements once BOTH are ready
+  useBrowserViolations({
+    enabled: monitoringEnabled,
+    identity,
+    sendViolation,
+  })
+
   useEffect(() => {
-    if (!webcamStream) return
-    if (videoRef.current) videoRef.current.srcObject = webcamStream
-    if (desktopVideoRef.current) desktopVideoRef.current.srcObject = webcamStream
-  }, [webcamStream, loading])
+    const controller = new AbortController()
 
-  const stopWebcam = () => {
-    if (webcamStream) webcamStream.getTracks().forEach(t => t.stop())
-    if (videoRef.current?.srcObject) {
-      (videoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop())
-      videoRef.current.srcObject = null
-    }
-    if (faceCheckInterval.current) clearInterval(faceCheckInterval.current)
-    if (faceCheckCountdown.current) clearInterval(faceCheckCountdown.current)
-  }
-
-  // Periodic face check every 20 seconds
-  useEffect(() => {
-    if (!webcamStream || !examData) return
-
-    setNextCheckIn(20)
-    faceCheckCountdown.current = setInterval(() => {
-      setNextCheckIn(prev => {
-        if (prev <= 1) return 20
-        return prev - 1
-      })
-    }, 1000)
-
-    faceCheckInterval.current = setInterval(() => {
-      captureFaceForCheck()
-    }, 20000)
-
-    return () => {
-      if (faceCheckInterval.current) clearInterval(faceCheckInterval.current)
-      if (faceCheckCountdown.current) clearInterval(faceCheckCountdown.current)
-    }
-  }, [webcamStream, examData])
-
-  const captureFaceForCheck = async () => {
-    const video = videoRef.current
-    const canvas = canvasRef.current
-    if (!video || !canvas || !examData) return
-
-    // Guard: video must be streaming real frames before we capture
-    if (video.readyState < 2 || video.videoWidth === 0 || video.videoHeight === 0) {
-      console.warn('Face check skipped: video not ready yet')
-      return
-    }
-
-    setFaceStatus('checking')
-    canvas.width = video.videoWidth
-    canvas.height = video.videoHeight
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-    ctx.drawImage(video, 0, 0)
-    const base64 = canvas.toDataURL('image/jpeg').split(',')[1]
-
-    try {
-      const res = await fetch(`${BASE_URL}/exam_session/${exam_uid}/student/${enrollment_uid}/verify-face`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ face_image: base64 }),
-      })
-      const data = await res.json()
-      if (data.status === 'ok') {
-        setFaceStatus('ok')
-      } else if (data.status === 'queued') {
-        // Background task is running, don't flag as warning or send violation
-        setFaceStatus('checking')
-      } else {
-        setFaceStatus('warning')
-        // SILENT LOGGING: Send to monitor without distracting the student
-        sendWsViolation(data.violation_type || 'face_check_failed', data.message)
-      }
-    } catch {
-      setFaceStatus('warning')
-    }
-  }
-
-  // ─── Tab switch detection ────────────────────────────────────────────────
-  useEffect(() => {
-    const onVisibilityChange = async () => {
-      if (document.hidden) {
-        tabSwitchCount.current += 1
-
-        
-        try {
-          const url = `${BASE_URL}/exam_session/${exam_uid}/student/${enrollment_uid}/violation`
-          console.log("Logging tab switch to:", url)
-          const res = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            keepalive: true,
-            body: JSON.stringify({ violation_type: 'tab_switch', count: tabSwitchCount.current }),
-          })
-          
-          // ALWAYS notify the monitor immediately via WebSocket, even if DB logging fails
-          sendWsViolation('tab_switch', `Student switched tabs (${tabSwitchCount.current}×)`)
-
-          if (!res.ok) {
-            console.error("Failed to log tab switch (Server error):", res.status)
-          }
-        } catch (e) { console.error("Failed to log tab switch (Network error):", e) }
-      }
-    }
-    const onBlur = async () => {
-
-
+    const fetchExam = async () => {
       try {
-        const url = `${BASE_URL}/exam_session/${exam_uid}/student/${enrollment_uid}/violation`
-        console.log("🚀 Logging focus loss to:", url)
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+        const response = await fetch(examSessionUrl(identity, '/questions'), {
           credentials: 'include',
-          keepalive: true,
-          body: JSON.stringify({ violation_type: 'focus_loss', count: 1 }),
+          signal: controller.signal,
         })
-        
-        // Notify monitor immediately
-        sendWsViolation('focus_loss', 'Exam window lost focus')
-
-        if (!res.ok) {
-          console.error("Failed to log focus loss (Server error):", res.status)
-        }
-      } catch (e) { console.error("Failed to log focus loss (Network error):", e) }
-    }
-    document.addEventListener('visibilitychange', onVisibilityChange)
-    window.addEventListener('blur', onBlur)
-    return () => {
-      document.removeEventListener('visibilitychange', onVisibilityChange)
-      window.removeEventListener('blur', onBlur)
-    }
-  }, [])
-
-  useEffect(() => {
-    const block = (e: MouseEvent) => e.preventDefault()
-    document.addEventListener('contextmenu', block)
-    return () => document.removeEventListener('contextmenu', block)
-  }, [])
-
-  const selectOption = async (questionUid: string, optionUid: string, sessionUid: string) => {
-    setAnswers(prev => ({ ...prev, [questionUid]: optionUid }))
-    setSaveStatus(prev => ({ ...prev, [questionUid]: 'saving' }))
-
-    let attempt = 0
-    while (attempt < 3) {
-      try {
-        const res = await fetch(
-          `${BASE_URL}/exam_session/${exam_uid}/student/${enrollment_uid}/questions/${questionUid}/answer`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({
-              exam_session_uid: sessionUid,
-              selected_option_uids: [optionUid],
-            }),
-          }
-        )
-        if (res.ok) {
-          setSaveStatus(prev => ({ ...prev, [questionUid]: 'idle' }))
+        if (response.status === 409) {
+          setSubmitted(true)
           return
         }
-      } catch { /* retry */ }
-      attempt++
-      await new Promise(r => setTimeout(r, 500))
+        if (!response.ok) {
+          const result = await response.json()
+          setError(result.detail || 'Failed to load exam.')
+          return
+        }
+        const result: ExamData = await response.json()
+        setExamData(result)
+        setAnswers(restoreSavedAnswers(result.saved_answers))
+      } catch (requestError) {
+        if ((requestError as Error).name !== 'AbortError') {
+          setError('Failed to connect to the exam server.')
+        }
+      } finally {
+        if (!controller.signal.aborted) setLoading(false)
+      }
     }
-    // All retries failed
-    setSaveStatus(prev => ({ ...prev, [questionUid]: 'error' }))
-  }
 
-  // ─── Submit ───────────────────────────────────────────────────────────────
-  const submitExam = async () => {
+    void fetchExam()
+    return () => controller.abort()
+  }, [identity, setAnswers])
+
+  const showTemporaryViolation = useCallback((message: string) => {
+    setViolationBanner(message)
+    window.setTimeout(() => setViolationBanner(''), 5000)
+  }, [])
+
+  const submitExam = useCallback(async () => {
     if (isSubmitting || submitted) return
     setIsSubmitting(true)
-    setShowSubmitModal(false)
+    setSubmitModalOpen(false)
     try {
-      const res = await fetch(
-        `${BASE_URL}/exam_session/${exam_uid}/student/${enrollment_uid}/submit_answers`,
-        { method: 'POST', credentials: 'include' }
-      )
-      if (res.ok) {
-        const data = await res.json()
+      const response = await fetch(examSessionUrl(identity, '/submit_answers'), {
+        method: 'POST',
+        credentials: 'include',
+      })
+      if (response.ok) {
+        const result = await response.json()
         setSubmitted(true)
-        setSubmittedAt(data.submitted_time)
+        setSubmittedAt(result.submitted_time)
         stopWebcam()
       } else {
-        const err = await res.json()
-        setViolationBanner(`Submission failed: ${err.detail}`)
-        setTimeout(() => setViolationBanner(''), 5000)
+        const result = await response.json()
+        showTemporaryViolation(`Submission failed: ${result.detail}`)
       }
     } catch {
-      setViolationBanner('Network error during submission. Please try again.')
-      setTimeout(() => setViolationBanner(''), 5000)
+      showTemporaryViolation('Network error during submission. Please try again.')
     } finally {
       setIsSubmitting(false)
     }
+  }, [
+    identity,
+    isSubmitting,
+    showTemporaryViolation,
+    stopWebcam,
+    submitted,
+  ])
+
+  const timeLeft = useExamTimer({
+    enabled: Boolean(examData) && !submitted,
+    expectedEndTime: examData?.expected_end_time,
+    storageKey: `exam_end_${examUid}_${enrollmentUid}`,
+    onExpire: () => void submitExam(),
+  })
+
+  if (submitted) return <ExamSubmitted submittedAt={submittedAt} />
+  if (loading) return <ExamLoading />
+  if (error || !examData) return <ExamLoadError message={error} />
+  if (examData.questions.length === 0) {
+    return <ExamLoadError message="This exam has no questions." />
   }
 
-  // ─── Helpers ──────────────────────────────────────────────────────────────
-  const formatTime = (secs: number | null) => {
-    if (secs === null) return '--:--:--'
-    const h = Math.floor(secs / 3600)
-    const m = Math.floor((secs % 3600) / 60)
-    const s = secs % 60
-    return [h, m, s].map(v => String(v).padStart(2, '0')).join(':')
-  }
-
-  const timerColor = () => {
-    if (timeLeft === null) return 'text-slate-400'
-    const total = (examData?.questions.length ?? 1) * 60
-    const pct = timeLeft / (total || 1)
-    if (pct < 0.10) return 'text-red-400'
-    if (pct < 0.20) return 'text-amber-400'
-    return 'text-green-400'
-  }
-
+  const currentQuestion = examData.questions[currentIndex]
   const answeredCount = Object.keys(answers).length
-  const totalCount = examData?.questions.length ?? 0
+  const totalCount = examData.questions.length
 
-  if (submitted) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-blue-950 p-4">
-        <div className="w-full max-w-md bg-white/5 backdrop-blur border border-white/10 rounded-2xl p-10 text-center shadow-2xl">
-          {/* <div className="w-20 h-20 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-6">
-            <CheckCircle size={40} className="text-green-400" />
-          </div> */}
-          <h1 className="text-3xl font-bold text-white mb-2">Exam Submitted!</h1>
-          <p className="text-slate-400 mb-6">Your answers have been securely recorded.</p>
-          {submittedAt && (
-            <div className="bg-white/5 border border-white/10 rounded-xl p-4 mb-6 text-sm">
-              <div className="text-slate-400 text-xs uppercase tracking-wider mb-1">Submitted at</div>
-              <div className="text-white font-semibold">{new Date(submittedAt).toLocaleString()}</div>
-            </div>
-          )}
-          <p className="text-slate-400 text-sm">You may close this window. Good luck with your results!</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-900">
-        <div className="text-center">
-          <Loader2 size={36} className="animate-spin text-blue-400 mx-auto mb-3" />
-          <p className="text-slate-400">Loading exam...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (error || !examData) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-900 p-4">
-        <div className="w-full max-w-md text-center">
-          <AlertTriangle size={36} className="text-red-400 mx-auto mb-3" />
-          <p className="text-red-300 font-semibold mb-2">Cannot load exam</p>
-          <p className="text-slate-400 text-sm">{error}</p>
-        </div>
-      </div>
-    )
-  }
-
-  const currentQuestion = examData.questions[currentIdx]
-
-  // ─── Main exam interface ──────────────────────────────────────────────────
   return (
     <div
       className="h-screen flex flex-col bg-white text-slate-900 overflow-hidden select-none"
-      onCopy={e => e.preventDefault()}
+      onCopy={(event) => event.preventDefault()}
     >
-      {/* Violation banner */}
-      {violationBanner && (
-        <div className="bg-red-600/90 text-white text-sm font-semibold text-center py-2 px-4 flex items-center justify-center gap-2 z-50">
-          <ShieldAlert size={16} /> {violationBanner}
-          <button onClick={() => setViolationBanner('')} className="ml-2"><X size={14} /></button>
-        </div>
-      )}
+      <ViolationBanner
+        message={violationBanner}
+        onDismiss={() => setViolationBanner('')}
+      />
+      <ExamHeader
+        exam={examData}
+        isSubmitting={isSubmitting}
+        onOpenNavigator={() => setNavigatorOpen(true)}
+        onOpenSubmit={() => setSubmitModalOpen(true)}
+        timeLeft={timeLeft}
+      />
+      <MobileMonitorStrip
+        answeredCount={answeredCount}
+        canvasRef={canvasRef}
+        exam={examData}
+        faceStatus={faceStatus}
+        totalCount={totalCount}
+        videoRef={mobileVideoRef}
+      />
 
-      {/* ── TOP BAR ────────────────────────────────────────────────────────── */}
-      <header className="h-14 md:h-16 shrink-0 bg-white border-b border-slate-200 flex items-center justify-between px-3 md:px-6 shadow-sm z-10 gap-2">
-        {/* Left: hamburger (mobile) + logo */}
-        <div className="flex items-center gap-2 min-w-0">
-          {/* Mobile nav toggle */}
-          <button
-            id="mobile-nav-toggle"
-            className="md:hidden flex items-center justify-center w-9 h-9 rounded-lg bg-slate-100 text-slate-600 shrink-0"
-            onClick={() => setNavDrawerOpen(true)}
-            aria-label="Open question navigator"
-          >
-            <Menu size={20} />
-          </button>
-          <Image
-            src="/examloc_logo.png"
-            alt="ExamLoc Logo"
-            width={100}
-            height={28}
-            className="object-contain shrink-0"
-          />
-          {/* Student info — hidden on mobile */}
-          <div className="hidden md:block ml-8">
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-slate-900">{examData.student_first_name} {examData.student_last_name}</span>
-              <span className="text-slate-300">|</span>
-              <span className="text-xs font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">{examData.student_id}</span>
-            </div>
-            <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wider mt-0.5">
-              Exam ID: {examData.exam_uid.split('-')[0]} • {totalCount} Questions
-            </p>
-          </div>
-        </div>
-
-        {/* Right: timer + submit */}
-        <div className="flex items-center gap-2 md:gap-6 shrink-0">
-          <div className={`flex items-center gap-1.5 font-mono text-base md:text-xl font-bold px-3 md:px-4 py-1.5 bg-slate-50 border border-slate-200 rounded-xl ${timerColor()}`}>
-            <Clock size={16} className="md:w-[18px] md:h-[18px]" />
-            {formatTime(timeLeft)}
-          </div>
-          <button
-            id="submit-exam-btn"
-            onClick={() => setShowSubmitModal(true)}
-            disabled={isSubmitting}
-            className="px-3 md:px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs md:text-sm font-bold rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-blue-600/20 disabled:opacity-50"
-          >
-            Finish
-          </button>
-        </div>
-      </header>
-
-      {/* ── MOBILE: compact webcam strip ────────────────────────────────────── */}
-      <div className="md:hidden shrink-0 bg-slate-900 flex items-center gap-3 px-3 py-2 border-b border-slate-700">
-        <div className="relative rounded-xl overflow-hidden bg-black w-20 h-14 shrink-0 ring-1 ring-slate-600">
-          <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
-          <canvas ref={canvasRef} className="hidden" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Live Monitoring Active</p>
-          <p className="text-xs text-slate-300 font-medium truncate">{examData.student_first_name} {examData.student_last_name}</p>
-          <p className="text-[10px] text-slate-500 font-mono truncate">{examData.student_id}</p>
-        </div>
-        {/* Mobile progress pill */}
-        <div className="shrink-0 text-right">
-          <div className="text-[10px] text-slate-400 uppercase tracking-wider">Progress</div>
-          <div className="text-sm font-black text-white">{answeredCount}<span className="text-slate-400 font-normal">/{totalCount}</span></div>
-        </div>
-      </div>
-
-      {/* ── BODY ────────────────────────────────────────────────────────────── */}
       <div className="flex flex-1 overflow-hidden">
-
-        {/* ── DESKTOP LEFT — Navigator ─────────────────────────────────────── */}
-        <aside className="hidden md:flex w-64 shrink-0 bg-slate-50 border-r border-slate-200 flex-col overflow-y-auto">
-          <div className="p-5 border-b border-slate-200 bg-white">
-            <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Question Navigator</div>
-            <div className="flex items-center gap-2">
-              <div className="text-sm font-bold text-slate-900">{answeredCount}</div>
-              <div className="text-xs text-slate-400">of {totalCount} answered</div>
-            </div>
-          </div>
-          <div className="p-4 grid grid-cols-4 gap-2.5">
-            {examData.questions.map((q, i) => {
-              const isAnswered = !!answers[q.uid]
-              const isCurrent = i === currentIdx
-              return (
-                <button
-                  key={q.uid}
-                  id={`nav-q-${i + 1}`}
-                  onClick={() => setCurrentIdx(i)}
-                  className={`w-full aspect-square rounded-xl text-xs font-bold transition-all border ${
-                    isCurrent
-                      ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-600/20'
-                      : isAnswered
-                      ? 'bg-blue-50 text-blue-600 border-blue-200'
-                      : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300 hover:bg-slate-100'
-                  }`}
-                >
-                  {i + 1}
-                </button>
-              )
-            })}
-          </div>
-          <div className="p-5 mt-auto border-t border-slate-200 bg-white space-y-3">
-            <div className="flex items-center gap-3 text-xs font-medium text-slate-600">
-              <div className="w-3 h-3 rounded bg-blue-50 border border-blue-200" /> Answered
-            </div>
-            <div className="flex items-center gap-3 text-xs font-medium text-slate-600">
-              <div className="w-3 h-3 rounded bg-white border border-slate-200" /> Unanswered
-            </div>
-          </div>
-        </aside>
-
-        {/* ── MOBILE NAV DRAWER ────────────────────────────────────────────── */}
-        {navDrawerOpen && (
-          <>
-            {/* Overlay */}
-            <div
-              className="md:hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40"
-              onClick={() => setNavDrawerOpen(false)}
-            />
-            {/* Drawer panel */}
-            <div className="md:hidden fixed left-0 top-0 bottom-0 w-72 bg-white z-50 flex flex-col shadow-2xl">
-              <div className="flex items-center justify-between p-4 border-b border-slate-200">
-                <div>
-                  <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Question Navigator</div>
-                  <div className="text-sm font-bold text-slate-900 mt-0.5">{answeredCount} of {totalCount} answered</div>
-                </div>
-                <button
-                  onClick={() => setNavDrawerOpen(false)}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-100 text-slate-500"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-              <div className="flex-1 overflow-y-auto p-4 grid grid-cols-5 gap-2.5">
-                {examData.questions.map((q, i) => {
-                  const isAnswered = !!answers[q.uid]
-                  const isCurrent = i === currentIdx
-                  return (
-                    <button
-                      key={q.uid}
-                      id={`mobile-nav-q-${i + 1}`}
-                      onClick={() => { setCurrentIdx(i); setNavDrawerOpen(false) }}
-                      className={`w-full aspect-square rounded-xl text-xs font-bold transition-all border ${
-                        isCurrent
-                          ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-600/20'
-                          : isAnswered
-                          ? 'bg-blue-50 text-blue-600 border-blue-200'
-                          : 'bg-white text-slate-400 border-slate-200'
-                      }`}
-                    >
-                      {i + 1}
-                    </button>
-                  )
-                })}
-              </div>
-              <div className="p-4 border-t border-slate-200 space-y-2">
-                <div className="flex items-center gap-3 text-xs font-medium text-slate-600">
-                  <div className="w-3 h-3 rounded bg-blue-50 border border-blue-200" /> Answered
-                </div>
-                <div className="flex items-center gap-3 text-xs font-medium text-slate-600">
-                  <div className="w-3 h-3 rounded bg-white border border-slate-200" /> Unanswered
-                </div>
-                <button
-                  onClick={() => { setNavDrawerOpen(false); setShowSubmitModal(true) }}
-                  className="w-full mt-2 py-3 bg-slate-900 text-white text-sm font-bold rounded-xl flex items-center justify-center gap-2"
-                >
-                   Submit Final Script
-                </button>
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* ── CENTER — Question ─────────────────────────────────────────────── */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-8">
-          <div className="max-w-2xl mx-auto">
-            {/* Question number + text */}
-            <div className="mb-6 md:mb-8">
-              <div className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-2 md:mb-3">
-                Question {currentIdx + 1} of {totalCount}
-              </div>
-              <p className="text-lg md:text-xl text-slate-900 leading-relaxed font-semibold">
-                {currentQuestion.question_text}
-              </p>
-              {saveStatus[currentQuestion.uid] === 'error' && (
-                <div className="mt-2 flex items-center gap-1.5 text-xs text-red-400">
-                  <AlertTriangle size={12} /> Failed to save — will retry on next selection
-                </div>
-              )}
-            </div>
-
-            {/* Options */}
-            <div className="space-y-3 md:space-y-4">
-              {currentQuestion.options.map((opt, oi) => {
-                const isSelected = answers[currentQuestion.uid] === opt.uid
-                const letter = String.fromCharCode(65 + oi)
-                return (
-                  <button
-                    key={opt.uid}
-                    id={`opt-${currentIdx + 1}-${letter}`}
-                    onClick={() => selectOption(currentQuestion.uid, opt.uid, examData.session_uid)}
-                    className={`w-full text-left p-4 md:p-5 rounded-2xl border-2 transition-all duration-200 flex items-start gap-3 md:gap-4 group ${
-                      isSelected
-                        ? 'bg-blue-50 border-blue-500 text-blue-900'
-                        : 'bg-white border-slate-100 text-slate-600 hover:border-blue-200 hover:bg-slate-50 shadow-sm'
-                    }`}
-                  >
-                    <span className={`shrink-0 w-8 h-8 rounded-xl flex items-center justify-center text-sm font-bold transition-all ${
-                      isSelected ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20' : 'bg-slate-100 text-slate-400 group-hover:bg-slate-200'
-                    }`}>
-                      {letter}
-                    </span>
-                    <span className="text-sm md:text-base font-medium leading-relaxed pt-1">{opt.option_text}</span>
-                    {isSelected && <CheckCircle size={20} className="shrink-0 ml-auto text-blue-500 mt-1" />}
-                  </button>
-                )
-              })}
-            </div>
-
-            {/* Navigation buttons */}
-            <div className="flex items-center justify-between mt-8 md:mt-12 pt-6 md:pt-8 border-t border-slate-100">
-              <button
-                onClick={() => setCurrentIdx(i => Math.max(0, i - 1))}
-                disabled={currentIdx === 0}
-                className="px-4 md:px-6 py-2.5 md:py-3 bg-white border border-slate-200 text-slate-600 text-sm font-bold rounded-xl hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-              >
-                ← Back
-              </button>
-              {currentIdx < totalCount - 1 ? (
-                <button
-                  onClick={() => setCurrentIdx(i => i + 1)}
-                  className="px-6 md:px-8 py-2.5 md:py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-blue-600/20"
-                >
-                  Next →
-                </button>
-              ) : (
-                <button
-                  onClick={() => setShowSubmitModal(true)}
-                  className="px-6 md:px-8 py-2.5 md:py-3 bg-green-600 hover:bg-green-700 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-green-600/20 flex items-center gap-2"
-                >
-                   Finish Exam
-                </button>
-              )}
-            </div>
-          </div>
-        </main>
-
-        {/* ── DESKTOP RIGHT — Webcam + stats ───────────────────────────────── */}
-        <aside className="hidden md:flex w-72 shrink-0 bg-slate-50 border-l border-slate-200 flex-col p-6 gap-6">
-          <div>
-            <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Live Monitoring</div>
-            <div className="relative rounded-2xl overflow-hidden bg-slate-900 aspect-[4/3] shadow-lg ring-1 ring-slate-200">
-              <video ref={desktopVideoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
-              <canvas className="hidden" />
-            </div>
-          </div>
-
-          {/* Exam stats */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3 shadow-sm">
-            <div className="flex justify-between items-end">
-              <div>
-                <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Progress</div>
-                <div className="text-slate-900 font-black text-lg">{answeredCount}/{totalCount}</div>
-              </div>
-              <div className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">
-                {totalCount > 0 ? Math.round((answeredCount / totalCount) * 100) : 0}%
-              </div>
-            </div>
-            <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-              <div
-                className="bg-blue-600 h-full rounded-full transition-all duration-500 shadow-sm"
-                style={{ width: `${totalCount > 0 ? (answeredCount / totalCount) * 100 : 0}%` }}
-              />
-            </div>
-          </div>
-
-          <button
-            onClick={() => setShowSubmitModal(true)}
-            disabled={isSubmitting}
-            className="mt-auto w-full py-4 bg-slate-900 hover:bg-slate-800 text-white text-sm font-black rounded-2xl transition-all flex items-center justify-center gap-2 shadow-xl shadow-slate-900/10 disabled:opacity-50"
-          >
-            {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : null}
-            {isSubmitting ? 'Finalizing...' : 'Submit Final Script'}
-          </button>
-        </aside>
+        <QuestionNavigator
+          answers={answers}
+          currentIndex={currentIndex}
+          drawerOpen={navigatorOpen}
+          onCloseDrawer={() => setNavigatorOpen(false)}
+          onOpenSubmit={() => setSubmitModalOpen(true)}
+          onSelectQuestion={setCurrentIndex}
+          questions={examData.questions}
+        />
+        <QuestionDisplay
+          answers={answers}
+          currentIndex={currentIndex}
+          onOpenSubmit={() => setSubmitModalOpen(true)}
+          onSelectOption={(questionUid, optionUid) =>
+            void selectOption(questionUid, optionUid, examData.session_uid)
+          }
+          onSelectQuestion={setCurrentIndex}
+          question={currentQuestion}
+          saveStatus={saveStatus[currentQuestion.uid]}
+          totalQuestions={totalCount}
+        />
+        <ProctoringSidebar
+          answeredCount={answeredCount}
+          faceStatus={faceStatus}
+          isSubmitting={isSubmitting}
+          nextCheckIn={nextCheckIn}
+          onOpenSubmit={() => setSubmitModalOpen(true)}
+          totalCount={totalCount}
+          videoRef={desktopVideoRef}
+          websocketConnected={connected}
+        />
       </div>
 
-      {/* ── SUBMIT MODAL ────────────────────────────────────────────────────── */}
-      {showSubmitModal && (
-        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-800 border border-white/10 rounded-2xl p-6 md:p-8 w-full max-w-md shadow-2xl">
-            <div className="text-center mb-6">
-              <h2 className="text-xl font-bold text-white mb-2">Submit Your Exam?</h2>
-              <p className="text-slate-400 text-sm">This action cannot be undone.</p>
-            </div>
-
-            {answeredCount < totalCount && (
-              <div className="bg-amber-500/1 p-4 mb-6 text-sm text-amber-300 text-center">
-                You have <strong>{totalCount - answeredCount}</strong> unanswered question{totalCount - answeredCount !== 1 ? 's' : ''}.
-                Unanswered questions will receive no marks.
-              </div>
-            )}
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowSubmitModal(false)}
-                className="flex-1 py-3 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-xl transition-colors text-sm"
-              >
-                Continue Exam
-              </button>
-              <button
-                id="confirm-submit-btn"
-                onClick={submitExam}
-                disabled={isSubmitting}
-                className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : null}
-                Yes, Submit
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <SubmitModal
+        answeredCount={answeredCount}
+        isSubmitting={isSubmitting}
+        onCancel={() => setSubmitModalOpen(false)}
+        onConfirm={() => void submitExam()}
+        open={submitModalOpen}
+        totalCount={totalCount}
+      />
     </div>
   )
 }

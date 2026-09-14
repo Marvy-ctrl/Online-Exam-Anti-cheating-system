@@ -22,7 +22,6 @@ from src.institutions.router import institution_router
 from src.analytics.router import analytics_router
 from src.core.logger import configure_logging, get_logger
 from .config import Config
-from fastapi.staticfiles import StaticFiles
 
 
 logger = get_logger(__name__)
@@ -56,10 +55,6 @@ import os
 BACKEND_DIR = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 UPLOADS_DIR = os.path.join(BACKEND_DIR, "uploads")
 os.makedirs(os.path.join(UPLOADS_DIR, "snapshots"), exist_ok=True)
-
-from fastapi.staticfiles import StaticFiles
-app.mount("/static", StaticFiles(directory=UPLOADS_DIR), name="static")
-
 
 def _cors_origins() -> list[str]:
     """Build the CORS allowlist.

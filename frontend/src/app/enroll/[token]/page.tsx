@@ -1,7 +1,7 @@
 "use client"
 import React, { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
-import { ShieldCheck, AlertCircle, CheckCircle, Loader2, Clock } from 'lucide-react'
+import { ShieldCheck, AlertCircle, Loader2, Clock } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
 
@@ -24,7 +24,7 @@ export default function StudentEnrollPage() {
   const [error, setError] = useState("")
   const [success, setSuccess] = useState(false)
   const [alreadyEnrolled, setAlreadyEnrolled] = useState(false)
-  const [enrollmentUid, setEnrollmentUid] = useState("")
+  const [faceRegistrationToken, setFaceRegistrationToken] = useState("")
 
   useEffect(() => {
     const validateLink = async () => {
@@ -54,7 +54,7 @@ export default function StudentEnrollPage() {
             setLinkStatus('expired')
           }
         }
-      } catch (err) {
+      } catch {
         setLinkMessage("Network error confirming the link.")
         setLinkStatus('error')
       }
@@ -83,7 +83,10 @@ export default function StudentEnrollPage() {
 
       if (res.ok) {
         const data = await res.json()
-        setEnrollmentUid(data.uid)
+        if (!data.face_registration_token) {
+          throw new Error("Face registration token missing from enrollment response")
+        }
+        setFaceRegistrationToken(data.face_registration_token)
         setSuccess(true)
       } else {
         const errData = await res.json()
@@ -93,7 +96,7 @@ export default function StudentEnrollPage() {
           setError(errData.detail || "Enrollment failed. Please check your details.")
         }
       }
-    } catch (err) {
+    } catch {
       setError("Network error. Please check your connection and try again.")
     } finally {
       setLoading(false)
@@ -185,7 +188,7 @@ export default function StudentEnrollPage() {
           
           
           <Link
-            href={`/enroll/face-registration/${enrollmentUid}`}
+            href={`/enroll/face-registration/${encodeURIComponent(faceRegistrationToken)}`}
             className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all flex items-center justify-center gap-2"
           >
             Continue to Face Registration

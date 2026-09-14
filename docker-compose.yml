@@ -96,6 +96,7 @@ services:
       # Face verification
       FACE_SIMILARITY_THRESHOLD: ${FACE_SIMILARITY_THRESHOLD:-0.40}
       FACE_ENROLLMENT_MIN_PASSING: ${FACE_ENROLLMENT_MIN_PASSING:-3}
+      SNAPSHOT_RETENTION_DAYS: ${SNAPSHOT_RETENTION_DAYS:-7}
       # Encryption
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000}
     volumes:
@@ -140,6 +141,7 @@ services:
       CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-api_secret}
       FACE_SIMILARITY_THRESHOLD: ${FACE_SIMILARITY_THRESHOLD:-0.40}
       FACE_ENROLLMENT_MIN_PASSING: ${FACE_ENROLLMENT_MIN_PASSING:-3}
+      SNAPSHOT_RETENTION_DAYS: ${SNAPSHOT_RETENTION_DAYS:-7}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000}
     volumes:
       - uploads:/app/uploads
@@ -181,6 +183,7 @@ services:
       CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-api_secret}
       FACE_SIMILARITY_THRESHOLD: ${FACE_SIMILARITY_THRESHOLD:-0.40}
       FACE_ENROLLMENT_MIN_PASSING: ${FACE_ENROLLMENT_MIN_PASSING:-3}
+      SNAPSHOT_RETENTION_DAYS: ${SNAPSHOT_RETENTION_DAYS:-7}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000}
     volumes:
       - uploads:/app/uploads
@@ -190,6 +193,46 @@ services:
       redis:
         condition: service_healthy
     command: celery -A src.worker.celery_app worker --loglevel=info --queues=grading --pool=solo --concurrency=1
+
+  beat:
+    build: ./backend
+    image: examloc-api
+    container_name: examloc-beat
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://examloc:changeme@postgres:5432/examloc_db}
+      DB_SSL: ${DB_SSL:-false}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
+      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/0}
+      JWT_SECRET_EXAMINER: ${JWT_SECRET_EXAMINER:-insecure_examiner_secret}
+      JWT_SECRET_STUDENT: ${JWT_SECRET_STUDENT:-insecure_student_secret}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      DOMAIN: ${DOMAIN:-http://localhost:8000}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_BUCKET: ${MINIO_BUCKET:-snapshots}
+      MINIO_SECURE: ${MINIO_SECURE:-false}
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-465}
+      SMTP_USER: ${SMTP_USER:-you@gmail.com}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-password}
+      SMTP_FROM: ${SMTP_FROM:-you@gmail.com}
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-cloud_name}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-api_key}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-api_secret}
+      FACE_SIMILARITY_THRESHOLD: ${FACE_SIMILARITY_THRESHOLD:-0.40}
+      FACE_ENROLLMENT_MIN_PASSING: ${FACE_ENROLLMENT_MIN_PASSING:-3}
+      SNAPSHOT_RETENTION_DAYS: ${SNAPSHOT_RETENTION_DAYS:-7}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A src.worker.celery_app beat --loglevel=info
 
   worker-email:
     build: ./backend
@@ -222,6 +265,7 @@ services:
       CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-api_secret}
       FACE_SIMILARITY_THRESHOLD: ${FACE_SIMILARITY_THRESHOLD:-0.40}
       FACE_ENROLLMENT_MIN_PASSING: ${FACE_ENROLLMENT_MIN_PASSING:-3}
+      SNAPSHOT_RETENTION_DAYS: ${SNAPSHOT_RETENTION_DAYS:-7}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000}
     depends_on:
       postgres:

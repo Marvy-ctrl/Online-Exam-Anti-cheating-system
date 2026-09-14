@@ -1,15 +1,15 @@
 import uuid
 import json
+from pathlib import Path
 from src.auth.dependencies import AccessTokenBearer
-from src.analytics.router import access_token_bearer
-from fastapi import APIRouter, Depends, status, WebSocket, WebSocketDisconnect, BackgroundTasks, HTTPException, Response, Request
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi import APIRouter, Depends, status, WebSocket, WebSocketDisconnect, HTTPException, Response
+from fastapi.responses import FileResponse, StreamingResponse
 from src.websocket import manager
 from src.core.storage import storage_service
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.db.main import get_session
-from src.db.models import ExamSession
+from src.db.models import ExamStatus, Snapshot
 from .service import ExamSessionService
 from .schema import (
     StartExamRequest,
@@ -26,13 +26,21 @@ from .schema import (
     UpdateScoreRequest,
     BulkSendResultsRequest,
 )
-from datetime import datetime, timezone
-from src.auth.email import send_exam_result_email
+from datetime import datetime, timedelta, timezone
+from src.config import Config
 from src.auth.utils import create_student_token
 from src.auth.dependencies import verify_student_session
+from src.auth.redis import token_in_blocklist
+from src.auth.utils import decode_token
+from src.dependencies.roles import Role
+from src.core.logger import get_logger
+
+
 access_token_bearer = AccessTokenBearer()
+admin_role = Role(["admin"])
 exam_session_router = APIRouter()
 session_service = ExamSessionService()
+logger = get_logger(__name__)
 
 
 @exam_session_router.post(
@@ -92,11 +100,18 @@ async def choose_options(
     session: AsyncSession = Depends(get_session),
     token_data: dict = Depends(verify_student_session),
 ):
+    if request_data.exam_session_uid != token_data["session_uid"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Token does not match the requested exam session",
+        )
+
     result = await session_service.choose_options(
-        exam_session_uid=request_data.exam_session_uid,
+        exam_session_uid=token_data["session_uid"],
+        exam_uid=exam_uid,
         student_uid=student_uid,
         question_uid=question_uid,
-        selected_option_uids=request_data.selected_option_uids,
+        selected_option_uids=[str(uid) for uid in request_data.selected_option_uids],
         session=session,
     )
 
@@ -116,7 +131,9 @@ async def submit_answers(
     session: AsyncSession = Depends(get_session),
     token_data: dict = Depends(verify_student_session),
 ):
-    submit = await session_service.submit_exam(exam_uid, student_uid, session)
+    submit = await session_service.submit_exam(
+        token_data["session_uid"], exam_uid, student_uid, session
+    )
     
     # Clear the session token on submission
     response.delete_cookie("exam_auth_token", secure=True, samesite="none", path="/")
@@ -139,6 +156,7 @@ async def verify_face(
     token_data: dict = Depends(verify_student_session),
 ):
     result = await session_service.verify_face_loop(
+        session_uid=token_data["session_uid"],
         exam_uid=exam_uid,
         student_uid=student_uid,
         live_image_base64=request_data.face_image,
@@ -184,6 +202,7 @@ async def get_exam_questions(
     student_uid = enrollment_uid (ExamEnrollment.uid)
     """
     result = await session_service.get_exam_questions_for_student(
+        session_uid=token_data["session_uid"],
         exam_uid=exam_uid,
         student_uid=student_uid,
         session=session,
@@ -206,6 +225,7 @@ async def log_violation(
     Log a browser-detected violation (tab switching, window focus loss).
     """
     await session_service.record_violation(
+        session_uid=token_data["session_uid"],
         exam_uid=exam_uid,
         student_uid=student_uid,
         violation_type=request_data.violation_type,
@@ -228,12 +248,6 @@ async def log_violation(
     return {"message": "Violation logged successfully"}
 
 
-@exam_session_router.post(
-    "/{exam_uid}/identify",
-    response_model=ExamLinkValidateResponse,
-)
- 
- 
 @exam_session_router.post(
     "/{exam_uid}/identify",
     response_model=ExamLinkValidateResponse,
@@ -261,6 +275,8 @@ async def update_score(
     session_uid: str,
     request_data: UpdateScoreRequest,
     session: AsyncSession = Depends(get_session),
+    token_details: dict = Depends(access_token_bearer),
+    admin_only=Depends(admin_role),
 ):
     """
     Admin endpoint to update student score.
@@ -269,6 +285,7 @@ async def update_score(
         session_uid=session_uid,
         new_score=request_data.new_score,
         reason=request_data.adjustment_reason,
+        admin_uid=str(token_details["user"]["uid"]),
         session=session,
     )
     return {
@@ -285,11 +302,15 @@ async def update_score(
 async def get_exam_results(
     exam_uid: str,
     session: AsyncSession = Depends(get_session),
+    token_details: dict = Depends(access_token_bearer),
+    admin_only=Depends(admin_role),
 ):
     """
     Fetch all student results (sessions) for a specific exam.
     """
-    return await session_service.get_exam_results(exam_uid, session)
+    return await session_service.get_exam_results(
+        exam_uid, str(token_details["user"]["uid"]), session
+    )
 
 
 @exam_session_router.get(
@@ -299,11 +320,15 @@ async def get_exam_results(
 async def get_session_details(
     session_uid: str,
     session: AsyncSession = Depends(get_session),
+    token_details: dict = Depends(access_token_bearer),
+    admin_only=Depends(admin_role),
 ):
     """
     Fetch detailed audit log for a specific exam session.
     """
-    return await session_service.get_session_details(session_uid, session)
+    return await session_service.get_session_details(
+        session_uid, str(token_details["user"]["uid"]), session
+    )
 
 
 @exam_session_router.post("/session/{session_uid}/send-result")
@@ -311,18 +336,15 @@ async def send_result_email(
     session_uid: uuid.UUID,
     session: AsyncSession = Depends(get_session),
     token_details: dict = Depends(access_token_bearer),
+    admin_only=Depends(admin_role),
 ):
     """
     Send the final result to the student via email.
     Enqueues the email sending to a Celery background task.
     """
-    # Note: In a production system, we should verify the admin owns the exam
-    
-    # Check if session exists
-    session_statement = select(ExamSession).where(ExamSession.uid == session_uid)
-    result = await session.exec(session_statement)
-    if not result.first():
-        raise HTTPException(status_code=404, detail="Session not found")
+    await session_service.get_owned_session(
+        str(session_uid), str(token_details["user"]["uid"]), session
+    )
 
     # Enqueue to Celery
     from src.worker.tasks.email_tasks import send_result_email_task
@@ -336,29 +358,31 @@ async def bulk_send_results(
     request_data: BulkSendResultsRequest,
     session: AsyncSession = Depends(get_session),
     token_details: dict = Depends(access_token_bearer),
+    admin_only=Depends(admin_role),
 ):
     """
     Send final exam results to multiple students in bulk.
     """
     from src.worker.tasks.email_tasks import send_result_email_task
     
-    sent_count = 0
+    admin_uid = str(token_details["user"]["uid"])
+
+    # Authorize the complete batch before dispatching any external side effects.
     for s_uid in request_data.session_uids:
-        # Check if session exists
-        session_statement = select(ExamSession).where(ExamSession.uid == s_uid)
-        result = await session.exec(session_statement)
-        if result.first():
-            send_result_email_task.delay(str(s_uid))
-            sent_count += 1
+        await session_service.get_owned_session(str(s_uid), admin_uid, session)
+
+    for s_uid in request_data.session_uids:
+        send_result_email_task.delay(str(s_uid))
             
-    return {"message": f"Successfully queued {sent_count} result emails"}
+    return {"message": f"Successfully queued {len(request_data.session_uids)} result emails"}
 
 
 @exam_session_router.websocket("/{exam_uid}/student/{student_uid}/ws")
 async def exam_websocket_endpoint(
     websocket: WebSocket,
     exam_uid: str,
-    student_uid: str
+    student_uid: str,
+    session: AsyncSession = Depends(get_session),
 ):
     """
     WebSocket endpoint for real-time exam monitoring.
@@ -374,13 +398,24 @@ async def exam_websocket_endpoint(
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Missing token")
         return
 
-    from src.auth.utils import decode_token
     try:
         token_data = decode_token(token)
-        if token_data.get("role") != "student" or token_data.get("exam_uid") != exam_uid or token_data.get("sub") != student_uid:
+        if (
+            token_data.get("role") != "student"
+            or token_data.get("exam_uid") != exam_uid
+            or token_data.get("sub") != student_uid
+            or not token_data.get("session_uid")
+        ):
             await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid token scope")
             return
-    except Exception as e:
+
+        exam_session = await session_service.get_student_session(
+            token_data["session_uid"], exam_uid, student_uid, session
+        )
+        if exam_session.status != ExamStatus.in_progress:
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Session is not active")
+            return
+    except Exception:
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid token")
         return
 
@@ -389,26 +424,54 @@ async def exam_websocket_endpoint(
         while True:
             # Receive message from student (could be heartbeat or browser event)
             data = await websocket.receive_text()
-            print(f"📥 Received from student {student_uid}: {data}")
+            logger.debug(
+                "Student websocket message received",
+                student_uid=student_uid,
+                message_bytes=len(data.encode("utf-8")),
+            )
             message = {"type": "student_update", "student_uid": student_uid, "data": data}
             # Broadcast to any monitoring examiners
             await manager.notify_monitor(exam_uid, message)
     except WebSocketDisconnect:
         manager.disconnect_student(websocket, student_uid)
-    except Exception as e:
-        print(f"WS Error: {e}")
+    except Exception as exc:
+        logger.exception(
+            "Student websocket failed",
+            student_uid=student_uid,
+            error_type=type(exc).__name__,
+        )
         manager.disconnect_student(websocket, student_uid)
 
 
 @exam_session_router.websocket("/{exam_uid}/monitor/ws")
 async def exam_monitor_websocket_endpoint(
     websocket: WebSocket,
-    exam_uid: str
+    exam_uid: str,
+    session: AsyncSession = Depends(get_session),
 ):
     """
     WebSocket endpoint for examiners to monitor an exam in real-time.
     Receives all student updates broadcasted by the manager.
     """
+    token = websocket.cookies.get("access_token")
+    if not token:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Missing token")
+        return
+
+    try:
+        token_data = decode_token(token)
+        admin_uid = str(token_data["user"]["uid"])
+        if (
+            token_data.get("role") != "admin"
+            or token_data.get("refresh")
+            or await token_in_blocklist(token_data["jti"])
+        ):
+            raise ValueError("Invalid administrator token")
+        await session_service.get_owned_exam(exam_uid, admin_uid, session)
+    except Exception:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Unauthorized")
+        return
+
     await manager.connect_monitor(websocket, exam_uid)
     try:
         while True:
@@ -416,27 +479,62 @@ async def exam_monitor_websocket_endpoint(
             await websocket.receive_text()
     except WebSocketDisconnect:
         manager.disconnect_monitor(websocket, exam_uid)
-    except Exception as e:
-        print(f"Monitor WS Error: {e}")
+    except Exception as exc:
+        logger.exception(
+            "Exam monitor websocket failed",
+            exam_uid=exam_uid,
+            error_type=type(exc).__name__,
+        )
         manager.disconnect_monitor(websocket, exam_uid)
 
-@exam_session_router.get("/storage/snapshot/{session_uid}/{snapshot_file}")
-async def fetch_snapshot_image(session_uid: str, snapshot_file: str):
+@exam_session_router.get("/storage/snapshot/{session_uid}/{snapshot_uid}")
+async def fetch_snapshot_image(
+    session_uid: str,
+    snapshot_uid: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
+    token_details: dict = Depends(access_token_bearer),
+    admin_only=Depends(admin_role),
+):
     """
     Proxy endpoint to securely stream snapshots from MinIO.
     This prevents AWS signature mismatch issues in local development.
     """
-    if not storage_service.minio_available or not storage_service.minio_client:
-        raise HTTPException(status_code=404, detail="Storage not available")
-        
-    object_key = f"{session_uid}/{snapshot_file}"
-    try:
-        response = storage_service.minio_client.get_object(
-            storage_service.bucket_name, object_key
+    owned_session = await session_service.get_owned_session(
+        session_uid, str(token_details["user"]["uid"]), session
+    )
+
+    snapshot_result = await session.exec(
+        select(Snapshot).where(
+            Snapshot.uid == snapshot_uid,
+            Snapshot.session_uid == owned_session.uid,
+            Snapshot.violation_type.is_not(None),
+            Snapshot.timestamp
+            > datetime.now(timezone.utc)
+            - timedelta(days=Config.SNAPSHOT_RETENTION_DAYS),
         )
-        return StreamingResponse(
-            response.stream(32 * 1024), 
-            media_type="image/jpeg"
-        )
-    except Exception as e:
+    )
+    snapshot = snapshot_result.first()
+    if not snapshot:
+        raise HTTPException(status_code=404, detail="Snapshot not found")
+
+    if (
+        snapshot.object_key
+        and storage_service.minio_available
+        and storage_service.minio_client
+    ):
+        try:
+            response = storage_service.minio_client.get_object(
+                storage_service.bucket_name, snapshot.object_key
+            )
+            return StreamingResponse(response.stream(32 * 1024), media_type="image/jpeg")
+        except Exception:
+            raise HTTPException(status_code=404, detail="Image not found")
+
+    snapshots_root = (
+        Path(__file__).resolve().parents[2] / "uploads" / "snapshots"
+    ).resolve()
+    local_path = (snapshots_root / session_uid / f"{snapshot.uid}.jpg").resolve()
+    if snapshots_root not in local_path.parents or not local_path.is_file():
         raise HTTPException(status_code=404, detail="Image not found")
+
+    return FileResponse(local_path, media_type="image/jpeg")

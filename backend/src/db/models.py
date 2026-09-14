@@ -280,10 +280,10 @@ class ExamEnrollment(SQLModel, table=True):
     email: str = Field(index=True)
     student_id: str
     device_id: Optional[str] = Field(default=None, index=True, unique=False)
-    embedding_vector: Optional[List[float]] = Field(
+    embedding_vector: Optional[str] = Field(
         default=None,
-        sa_column=Column(pg.ARRAY(sa.Float), nullable=True),
-        description="128-d face embedding vector",
+        sa_column=Column(sa.Text, nullable=True),
+        description="AES-256-GCM encrypted 128-d face embedding",
     )
     deleted_at: Optional[datetime] = Field(
         sa_column=Column(TIMESTAMP(timezone=True), nullable=True)

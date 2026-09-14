@@ -28,7 +28,7 @@ async def register_face(
     Accepts 3-5 base64 images and stores a single averaged embedding.
     """
     result = await student_service.register_face(
-        enrollment_uid=str(face_data.enrollment_uid),
+        enrollment_token=face_data.enrollment_token,
         face_images_base64=face_data.face_images,
         session=session,
     )
@@ -57,7 +57,12 @@ async def student_enroll(
         session=session,
     )
 
-    return enrollment_record
+    return StudentEnrollResponse(
+        **enrollment_record.model_dump(),
+        face_registration_token=student_service.create_face_registration_token(
+            enrollment_record
+        ),
+    )
 
 @student_router.get(
     "/enroll/{token}/validate",

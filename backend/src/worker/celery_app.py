@@ -16,12 +16,14 @@ from src.config import Config
 
 celery_app = Celery(
     "examloc",
-    broker=Config.REDIS_URL,
-    backend=Config.REDIS_URL,
+    broker=Config.CELERY_BROKER_URL,
+    backend=Config.CELERY_RESULT_BACKEND,
     include=[
         "src.worker.tasks.face_tasks",
         "src.worker.tasks.grading_tasks",
         "src.worker.tasks.email_tasks",
+        "src.worker.tasks.completion_tasks",
+        "src.worker.tasks.evidence_tasks",
     ],
 )
 
@@ -42,7 +44,19 @@ celery_app.conf.update(
     task_routes={
         "src.worker.tasks.face_tasks.*": {"queue": "face"},
         "src.worker.tasks.grading_tasks.*": {"queue": "grading"},
+        "src.worker.tasks.completion_tasks.*": {"queue": "grading"},
+        "src.worker.tasks.evidence_tasks.*": {"queue": "grading"},
         "src.worker.tasks.email_tasks.*": {"queue": "default"},
+    },
+    beat_schedule={
+        "finalize-expired-exam-sessions": {
+            "task": "src.worker.tasks.completion_tasks.finalize_expired_sessions_task",
+            "schedule": 60.0,
+        },
+        "purge-expired-snapshot-evidence": {
+            "task": "src.worker.tasks.evidence_tasks.purge_snapshot_evidence_task",
+            "schedule": 3600.0,
+        },
     },
     # Per-task time limits are set in each task via @celery_app.task(soft_time_limit=...)
 )

@@ -1,4 +1,5 @@
 import os
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -39,10 +40,12 @@ class Settings(BaseSettings):
     # Lower = stricter. 0.40 is high-security. Read from env, never hardcoded.
     FACE_SIMILARITY_THRESHOLD: float = 0.40
     FACE_ENROLLMENT_MIN_PASSING: int = 3
+    # Violation evidence is automatically purged after this many days.
+    SNAPSHOT_RETENTION_DAYS: int = Field(default=7, ge=1)
     # AES-256-GCM encryption key for biometric data at rest.
     # Must be exactly 64 hex characters (32 bytes = 256 bits).
     # Generate with: python -c "import secrets; print(secrets.token_hex(32))"
-    ENCRYPTION_KEY: str
+    ENCRYPTION_KEY: str = Field(pattern=r"^[0-9a-fA-F]{64}$")
 
     model_config = SettingsConfigDict(
         env_file=os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"), 

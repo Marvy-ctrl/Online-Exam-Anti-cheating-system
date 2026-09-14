@@ -1,28 +1,16 @@
 from .schema import (
     QuestionUploadModel,
-    OptionsUploadModel,
-    BulkQuestionUploadModel,
     QuestionUpdateModel,
 )
 from src.db.models import Question, Options, Exam
 from sqlmodel.ext.asyncio.session import AsyncSession
-from src.exams.service import ExamService
 from sqlmodel import select
 from sqlalchemy.orm import selectinload
 from datetime import datetime, timezone
 from sqlalchemy import delete
 from uuid import UUID
 
-exam_service = ExamService()
-
-
 class QuestionService:
-
-    async def get_an_exam(self, exam_uid: str, session: AsyncSession):
-        statement = select(Exam).where(Exam.uid == exam_uid)
-        result = await session.exec(statement)
-        return result.first()
-
     async def get_all_questions(self, exam_uid: str, session: AsyncSession):
         statement = (
             select(Question)
@@ -33,8 +21,15 @@ class QuestionService:
         result = await session.exec(statement)
         return result.all()
 
-    async def get_a_question(self, question_uid: str, session: AsyncSession):
-        statement = select(Question).options(selectinload(Question.options)).where(Question.uid == question_uid)
+    async def get_owned_question(
+        self, question_uid: str, admin_uid: str, session: AsyncSession
+    ):
+        statement = (
+            select(Question)
+            .join(Exam, Question.exam_uid == Exam.uid)
+            .options(selectinload(Question.options))
+            .where(Question.uid == question_uid, Exam.admin_uid == admin_uid)
+        )
         result = await session.exec(statement)
         return result.first()
 
@@ -72,9 +67,12 @@ class QuestionService:
         self,
         question_uid: str,
         update_data: QuestionUpdateModel,
+        admin_uid: str,
         session: AsyncSession,
     ):
-        question_to_update = await self.get_a_question(question_uid, session)
+        question_to_update = await self.get_owned_question(
+            question_uid, admin_uid, session
+        )
         if not question_to_update:
             return None
 
@@ -109,9 +107,13 @@ class QuestionService:
 
         return question_to_update
 
-    async def delete_question(self, question_uid: str, session: AsyncSession):
+    async def delete_question(
+        self, question_uid: str, admin_uid: str, session: AsyncSession
+    ):
         from src.db.models import StudentAnswers
-        question_to_delete = await self.get_a_question(question_uid, session)
+        question_to_delete = await self.get_owned_question(
+            question_uid, admin_uid, session
+        )
         if not question_to_delete:
             return None
 
@@ -133,25 +135,27 @@ class QuestionService:
         await session.commit()
 
         return {"message": "Question deleted successfully"}
-
-
-   
-
     async def bulk_delete_questions(
-    self,
-    question_uids: list[str],
-    session: AsyncSession
-):
-        question_ids = [UUID(uid) for uid in question_uids]
-
-        await session.exec(
-            delete(Question).where(
-                Question.uid.in_(question_ids)
+        self,
+        question_uids: list[UUID],
+        admin_uid: str,
+        session: AsyncSession,
+    ):
+        question_ids = set(question_uids)
+        owned_result = await session.exec(
+            select(Question.uid)
+            .join(Exam, Question.exam_uid == Exam.uid)
+            .where(
+                Question.uid.in_(question_ids),
+                Exam.admin_uid == admin_uid,
             )
         )
+        owned_ids = set(owned_result.all())
+        if owned_ids != question_ids:
+            return False
+
+        await session.exec(delete(Question).where(Question.uid.in_(owned_ids)))
 
         await session.commit()
 
         return True
-
-    

@@ -2,7 +2,6 @@ import os
 import uuid
 import base64
 import logging
-from datetime import timedelta
 from typing import Dict, Any, Optional
 from minio.error import S3Error
 from minio.lifecycleconfig import LifecycleConfig, Rule, Expiration
@@ -44,13 +43,14 @@ class StorageService:
                 self.minio_client.make_bucket(self.bucket_name)
                 logger.info(f"Created MinIO bucket: {self.bucket_name}")
             
-            # Unconditionally enforce 7-day data retention policy for privacy/storage management
+            # MinIO expiry is a second layer of protection. The evidence cleanup
+            # task also removes expired database rows and local fallback files.
             config = LifecycleConfig([
                 Rule(
                     status="Enabled",
                     rule_filter=Filter(prefix=""),
-                    rule_id="expire-snapshots-7-days",
-                    expiration=Expiration(days=7)
+                    rule_id="expire-snapshots",
+                    expiration=Expiration(days=Config.SNAPSHOT_RETENTION_DAYS)
                 )
             ])
             self.minio_client.set_bucket_lifecycle(self.bucket_name, config)
@@ -72,7 +72,7 @@ class StorageService:
         
         Returns:
             dict containing:
-                "image_path": str (static relative URL or fallback path)
+                "image_path": str (storage location retained for compatibility)
                 "object_key": Optional[str] (MinIO object key, if uploaded to MinIO)
         """
 
@@ -124,9 +124,8 @@ class StorageService:
                 f.write(image_bytes)
             logger.info(f"Successfully saved snapshot {snapshot_uid} to local filesystem fallback.")
             
-            # The static URL will be accessible via FastAPI mounted StaticFiles at /static/snapshots/
-            # Static route resolves "uploads" to "/static", so uploads/snapshots/{session_uid}/{snapshot_uid}.jpg
-            # becomes /static/snapshots/{session_uid}/{snapshot_uid}.jpg
+            # This legacy path is stored for compatibility. Snapshot reads go
+            # through the authenticated exam-session endpoint, never /static.
             static_url = f"/static/snapshots/{session_uid}/{snapshot_uid}.jpg"
             return {
                 "image_path": static_url,
@@ -134,11 +133,81 @@ class StorageService:
             }
         except Exception as e:
             logger.error(f"Local storage fallback failed: {e}")
-            # As a final absolute fallback, return a raw inline base64 placeholder so we never crash the session
-            return {
-                "image_path": f"data:image/jpeg;base64,{image_data_str}",
-                "object_key": None,
-            }
+            # Never persist biometric image data inline in the database. The
+            # caller can still record the violation without retaining a frame.
+            raise RuntimeError("Snapshot storage is unavailable") from e
+
+    def delete_snapshot(
+        self,
+        session_uid: str,
+        snapshot_uid: uuid.UUID,
+        object_key: Optional[str] = None,
+        image_path: Optional[str] = None,
+    ) -> bool:
+        """Delete one retained snapshot from MinIO or local fallback storage.
+
+        Missing files are treated as already deleted. A temporary MinIO or
+        filesystem failure returns False so the cleanup task keeps the database
+        row and can retry later.
+        """
+        if object_key:
+            if not self.minio_available or not self.minio_client:
+                return False
+            try:
+                self.minio_client.remove_object(self.bucket_name, object_key)
+                return True
+            except S3Error as exc:
+                if exc.code in {"NoSuchKey", "NoSuchObject"}:
+                    return True
+                logger.warning(
+                    "Failed to delete MinIO snapshot",
+                    extra={"snapshot_uid": str(snapshot_uid), "error": exc.code},
+                )
+                return False
+            except Exception as exc:
+                logger.warning(
+                    "Failed to delete MinIO snapshot",
+                    extra={
+                        "snapshot_uid": str(snapshot_uid),
+                        "error": type(exc).__name__,
+                    },
+                )
+                return False
+
+        # Legacy inline values contain no external object. Removing their
+        # database row is sufficient to erase the retained image.
+        if image_path and image_path.startswith("data:image/"):
+            return True
+
+        backend_dir = os.path.abspath(
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
+        )
+        snapshots_root = os.path.realpath(
+            os.path.join(backend_dir, "uploads", "snapshots")
+        )
+        local_path = os.path.realpath(
+            os.path.join(snapshots_root, str(session_uid), f"{snapshot_uid}.jpg")
+        )
+        if os.path.commonpath([snapshots_root, local_path]) != snapshots_root:
+            logger.error("Refusing to delete snapshot outside storage root")
+            return False
+
+        try:
+            if os.path.exists(local_path):
+                os.remove(local_path)
+            parent_dir = os.path.dirname(local_path)
+            if os.path.isdir(parent_dir) and not os.listdir(parent_dir):
+                os.rmdir(parent_dir)
+            return True
+        except OSError as exc:
+            logger.warning(
+                "Failed to delete local snapshot",
+                extra={
+                    "snapshot_uid": str(snapshot_uid),
+                    "error": type(exc).__name__,
+                },
+            )
+            return False
 
     def generate_presigned_url(self, object_key: str) -> str:
         """

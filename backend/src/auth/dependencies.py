@@ -149,5 +149,11 @@ async def verify_student_session(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Token does not match the requested exam or student"
         )
+
+    if not token_data.get("session_uid"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Student token is missing its exam session scope"
+        )
         
     return token_data

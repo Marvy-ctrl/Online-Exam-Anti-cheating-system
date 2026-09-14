@@ -145,4 +145,4 @@ class ExamInvitationModel(BaseModel):
     custom_message: Optional[str] = ""
 
 class BulkUnenrollModel(BaseModel):
-    student_uids: list[str]
+    student_uids: list[UUID]

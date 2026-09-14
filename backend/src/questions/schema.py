@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from datetime import datetime
 from typing import List, Optional
+from uuid import UUID
 
 
 class QuestionUploadModel(BaseModel):
@@ -28,4 +29,4 @@ class QuestionUpdateModel(BaseModel):
 
 
 class BulkDeleteQuestionsModel(BaseModel):
-    question_uids: List[str]
+    question_uids: List[UUID]

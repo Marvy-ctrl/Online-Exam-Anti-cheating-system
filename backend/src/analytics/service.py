@@ -87,7 +87,20 @@ class AnalyticsService:
             "top_violators": top_violators,
         }
 
-    async def get_institution_analytics(self, session: AsyncSession, institution_uid: str):
+    async def get_institution_analytics(
+        self, session: AsyncSession, institution_uid: str, admin_uid: str
+    ):
+        institution = (
+            await session.exec(
+                select(Institution).where(
+                    Institution.uid == institution_uid,
+                    Institution.admin_uid == admin_uid,
+                )
+            )
+        ).first()
+        if not institution:
+            return None
+
         # 1. Overview stats
         total_exams_stmt = select(func.count(Exam.uid)).where(Exam.institution_uid == institution_uid)
         

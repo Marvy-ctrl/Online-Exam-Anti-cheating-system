@@ -44,6 +44,11 @@ async def create_subject(
 ):
     admin_uid = str(token_details.get("user")["uid"])
     new_subject = await exam_service.create_subject(subject_data, admin_uid, session)
+    if not new_subject:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Institution not found or unauthorized",
+        )
     return new_subject
 
 
@@ -109,6 +114,11 @@ async def create_exam(
 ):
     admin_uid = token_details.get("user")["uid"]
     new_exam = await exam_service.create_exam(exam_data, admin_uid, session)
+    if not new_exam:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Institution or subject not found or unauthorized",
+        )
     return new_exam
 
 
@@ -121,10 +131,12 @@ async def generate_enroll_link(
     admin_only=Depends(role),
 ):
 
-    exam = await exam_service.get_an_exam(exam_uid, session)
+    admin_uid = str(token_details["user"]["uid"])
+    exam = await exam_service.get_exam_owned_by(exam_uid, admin_uid, session)
     if not exam:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Exam not found"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Exam not found or unauthorized",
         )
 
     token = create_url_safe_token({"exam_uid": exam_uid})
@@ -180,7 +192,8 @@ async def get_exam(
     token_details: dict = Depends(access_token_bearer),
     admin_only=Depends(role),
 ):
-    exam = await exam_service.get_exam_with_subject(exam_uid, session)
+    admin_uid = str(token_details["user"]["uid"])
+    exam = await exam_service.get_exam_with_subject(exam_uid, admin_uid, session)
     if exam:
         return exam
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam not found")
@@ -245,8 +258,14 @@ async def pre_enroll(
     token_details: dict = Depends(access_token_bearer),
     admin_only=Depends(role),
 ):
-    # Role is already enforced by Depends(role) above — no inline check needed.
-    enroll = await exam_service.pre_enroll_students(student_details, exam_uid, session, raise_on_duplicate=True)
+    admin_uid = str(token_details["user"]["uid"])
+    enroll = await exam_service.pre_enroll_students(
+        student_details,
+        exam_uid,
+        admin_uid,
+        session,
+        raise_on_duplicate=True,
+    )
 
     if enroll is None:
         raise HTTPException(status_code=404, detail="Exam not found")
@@ -263,7 +282,10 @@ async def bulk_pre_enroll(
     token_details: dict = Depends(access_token_bearer),
     admin_only=Depends(role),
 ):
-    results = await exam_service.bulk_pre_enroll_students(bulk_data, exam_uid, session)
+    admin_uid = str(token_details["user"]["uid"])
+    results = await exam_service.bulk_pre_enroll_students(
+        bulk_data, exam_uid, admin_uid, session
+    )
     if results is None:
         raise HTTPException(status_code=404, detail="Exam not found")
     return results
@@ -295,7 +317,10 @@ async def bulk_unenroll_students(
         session, exam_uid, unenroll_data.student_uids, admin_uid
     )
     if not success:
-        raise HTTPException(status_code=404, detail="Exam not found or unauthorized")
+        raise HTTPException(
+            status_code=404,
+            detail="Exam or enrollment not found or unauthorized",
+        )
     return {"message": f"Successfully removed {len(unenroll_data.student_uids)} students from exam"}
 
 @exam_router.patch("/students/{student_uid}", response_model=StudentRosterResponseModel)
@@ -356,13 +381,13 @@ async def generate_exam_link(
     The link is valid only during exam.start_time → exam.end_time (enforced at entry).
     Token uses a 1-year max_age since timing is validated against the exam window, not token age.
     """
-    exam = await exam_service.get_an_exam(exam_uid, session)
-    if not exam:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam not found")
-
     admin_uid = str(token_details.get("user")["uid"])
-    if str(exam.admin_uid) != admin_uid:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorised")
+    exam = await exam_service.get_exam_owned_by(exam_uid, admin_uid, session)
+    if not exam:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Exam not found or unauthorized",
+        )
 
     token = create_url_safe_token({"exam_uid": exam_uid})
     exam_url = f"{Config.FRONTEND_URL}/exam/enter/{token}"
@@ -395,13 +420,13 @@ async def send_exam_link(
     from src.db.models import ExamEnrollment, ExamEnrollmentStatus
     from sqlmodel import select
 
-    exam = await exam_service.get_an_exam(exam_uid, session)
-    if not exam:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam not found")
-
     admin_uid = str(token_details.get("user")["uid"])
-    if str(exam.admin_uid) != admin_uid:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorised")
+    exam = await exam_service.get_exam_owned_by(exam_uid, admin_uid, session)
+    if not exam:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Exam not found or unauthorized",
+        )
 
     if not exam.exam_link:
         raise HTTPException(

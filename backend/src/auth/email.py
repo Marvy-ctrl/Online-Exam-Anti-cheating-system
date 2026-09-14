@@ -2,6 +2,10 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from src.config import Config
+from src.core.logger import get_logger
+
+
+logger = get_logger(__name__)
 
 
 def send_email(to_email: str, subject: str, html_content: str) -> None:
@@ -28,10 +32,12 @@ def send_email(to_email: str, subject: str, html_content: str) -> None:
                 server.starttls()
                 server.login(Config.SMTP_USER, Config.SMTP_PASSWORD)
                 server.sendmail(Config.SMTP_FROM, to_email, msg.as_string())
-    except Exception as e:
-        print(f"\n[NETWORK BLOCK] Failed to send email to {to_email}. Error: {e}")
-        print("Falling back to local console verification...")
-        raise ValueError("SMTP_BLOCKED")
+    except Exception as exc:
+        logger.exception(
+            "SMTP delivery failed",
+            error_type=type(exc).__name__,
+        )
+        raise ValueError("SMTP delivery failed") from exc
 
 
 def send_verification_email(to_email: str, token: str) -> None:
@@ -62,14 +68,7 @@ def send_verification_email(to_email: str, token: str) -> None:
     </body>
     </html>
     """
-    try:
-        send_email(to_email, "Verify your ExamLoc Account", html)
-    except ValueError:
-        print("\n\n" + "="*50)
-        print("🚨 MANUALLY VERIFY YOUR ACCOUNT TO CONTINUE 🚨")
-        print("Click this link since your network blocked the email:")
-        print("VERIFY LINK:", verification_url)
-        print("="*50 + "\n\n")
+    send_email(to_email, "Verify your ExamLoc Account", html)
 
 def send_exam_invitation_email(to_email: str, exam_title: str, enrollment_url: str, custom_message: str = "") -> None:
     """
@@ -128,14 +127,7 @@ def send_password_reset_email(to_email: str, token: str) -> None:
     </body>
     </html>
     """
-    try:
-        send_email(to_email, "Reset your ExamLoc Password", html)
-    except ValueError:
-        print("\n\n" + "="*50)
-        print("🚨 MANUALLY RESET YOUR PASSWORD TO CONTINUE 🚨")
-        print("Click this link since your network blocked the email:")
-        print("RESET LINK:", reset_url)
-        print("="*50 + "\n\n")
+    send_email(to_email, "Reset your ExamLoc Password", html)
 
 
 def send_exam_link_email(
@@ -189,15 +181,7 @@ def send_exam_link_email(
     </body>
     </html>
     """
-    try:
-        send_email(to_email, f"Enter Your Exam: {exam_title}", html)
-    except ValueError:
-        print("\n" + "="*60)
-        print("🚀 STUDENT EXAM LINK (EMAIL BLOCKED) 🚀")
-        print(f"STUDENT: {student_name} ({to_email})")
-        print(f"EXAM:    {exam_title}")
-        print(f"LINK:    {exam_url}")
-        print("="*60 + "\n")
+    send_email(to_email, f"Enter Your Exam: {exam_title}", html)
 
 def send_exam_result_email(
     to_email: str,

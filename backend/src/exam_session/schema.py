@@ -18,8 +18,8 @@ class StartExamResponse(BaseModel):
 
 class ChooseOptionsRequest(BaseModel):
     exam_session_uid: str
-    selected_option_uids: List[str] = Field(
-        default=[],
+    selected_option_uids: List[UUID] = Field(
+        default_factory=list,
         description="List of selected option UIDs. Empty list for unanswered questions.",
     )
 
