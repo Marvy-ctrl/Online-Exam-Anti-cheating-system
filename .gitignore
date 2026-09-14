@@ -71,6 +71,12 @@ scratch/**/*.png
 scratch/**/*.csv
 scratch/**/*.rdb
 
+# Local load-test credentials, virtual environment, and raw measurements.
+performance/.env
+performance/.venv/
+performance/results/*
+!performance/results/.gitkeep
+
 # Thesis/report drafts — collaborator's convention (added upstream in 26e11ca).
 report/
 
@@ -80,3 +86,4 @@ report/
 **/.env.*
 !**/.env.example
 !.env.production.example
+performance/.env.example
