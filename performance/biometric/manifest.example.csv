@@ -1,0 +1,9 @@
+sample_id,subject_id,role,image_path
+s001_enroll_1,subject_001,enrollment,subject_001/enrollment_1.jpg
+s001_enroll_2,subject_001,enrollment,subject_001/enrollment_2.jpg
+s001_enroll_3,subject_001,enrollment,subject_001/enrollment_3.jpg
+s001_probe_1,subject_001,probe,subject_001/probe_1.jpg
+s002_enroll_1,subject_002,enrollment,subject_002/enrollment_1.jpg
+s002_enroll_2,subject_002,enrollment,subject_002/enrollment_2.jpg
+s002_enroll_3,subject_002,enrollment,subject_002/enrollment_3.jpg
+s002_probe_1,subject_002,probe,subject_002/probe_1.jpg

@@ -7,8 +7,9 @@ exam workspace, its students, and its questions. A separate login scenario
 measures authentication without distorting read latency.
 
 Results from a developer laptop describe only that tested environment. They are
-not production-capacity claims. Existing references to 50 concurrent users,
-FAR, or FRR remain unverified until repeatable evidence is recorded here.
+not production-capacity claims. FAR, FRR, latency, and throughput values may be
+published only from a retained report with its configuration, sample counts,
+limitations, and reproduction procedure.
 
 ## Safety boundary
 
@@ -28,17 +29,20 @@ FAR, or FRR remain unverified until repeatable evidence is recorded here.
 performance/
 ├── .env.example
 ├── README.md
+├── biometric/                 # FEI threshold evaluation and aggregate report
+├── face_worker/               # isolated queue/worker throughput harness
 ├── locustfile.py
 ├── login_locustfile.py
 ├── requirements.txt
 ├── results/
-└── scenarios/
-    ├── admin_login.py
-    └── admin_reads.py
+├── scenarios/
+│   ├── admin_login.py
+│   └── admin_reads.py
+└── session_policy/            # repeated-observation policy simulation
 ```
 
-Raw result files are ignored by Git. Keep reviewed summaries or charts in a
-future `performance/reports/` directory when the measurements are trustworthy.
+Raw result files are ignored by Git. Aggregate reports contain no credentials,
+face images, embeddings, pair scores, or subject-level outcomes.
 
 ## Environment under test
 
@@ -188,3 +192,17 @@ size. Do not choose the criteria after seeing the results.
 4. Repeat each scenario at least three times.
 5. Report the median run and the observed range, not only the best result.
 6. Preserve failures and limitations alongside successful measurements.
+
+## Retained evaluation reports
+
+- [FEI threshold evaluation](biometric/reports/fei_threshold_evaluation.md)
+  reports identity-disjoint calibration and held-out FAR/FRR measurements. It
+  concludes that the deployed `0.40` threshold is strict and should not be
+  changed from this dataset alone.
+- [FEI repeated-observation evaluation](session_policy/reports/fei_repeated_observation_evaluation.md)
+  reports an offline simulation of session-level policies. It does not change
+  the production threshold or worker behavior.
+
+Face-worker runs and API load-test CSV files remain local until a reviewed
+aggregate report records a stable environment and repeated runs. Do not cite an
+individual raw run as a general scalability result.

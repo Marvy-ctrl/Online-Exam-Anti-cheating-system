@@ -1,54 +1,35 @@
-# ExamLoc — Task Tracker
+# ExamLoc v2 implementation tracker
 
-## Phase 0 — Face Verification Accuracy (CURRENT)
+Last aligned with the implementation: 2026-09-16.
 
-### Backend
+## Completed engineering stages
 
-- [x] Add `FACE_SIMILARITY_THRESHOLD` to `config.py`
-- [x] Create `backend/src/students/face_utils.py` (`check_image_quality`, `get_face_embedding`, `average_embeddings`)
-- [x] Update `backend/src/students/schema.py` — `RegisterFaceRequest` accepts `face_images: list[str]`
-- [x] Rewrite `StudentService.register_face` — 5 images → quality gate → average → store
-- [x] Replace hardcoded thresholds in `exam_session/service.py` with `Config.FACE_SIMILARITY_THRESHOLD`
+- [x] Administrator and student authorization hardening.
+- [x] Institution/exam ownership enforcement and protected evidence access.
+- [x] Server-authoritative deadlines and periodic expired-session finalization.
+- [x] Asynchronous grading and dedicated worker routing.
+- [x] Signed-token face enrollment with 3–5 captures and multi-image averaging.
+- [x] AES-256-GCM encryption for persisted face templates.
+- [x] Violation-only evidence retention, deduplication, and scheduled expiry.
+- [x] Authoritative Alembic configuration and migration regression coverage.
+- [x] Student exam decomposition into timer, answer-sync, browser, webcam, and WebSocket hooks.
+- [x] Administrator exam, institution, audit, and question-management decomposition.
+- [x] Backend lifecycle, authorization, ownership, completion, biometric, retention, migration, and logging tests.
+- [x] Frontend component/hook tests for key refactored workspaces.
+- [x] Reproducible API, biometric, face-worker, and session-policy evaluation harnesses.
+- [x] Root, backend, frontend, performance, privacy, and research documentation alignment.
 
-### Frontend
+## Research decisions
 
-- [x] Install `face-api.js` + download model weights
-- [x] Build `FaceEnrollmentFlow` component (5-step circular progress UI)
-- [x] Per-step client checks: brightness, face detected, eyes open, pose hint
-- [x] Auto-capture trigger + step animation
-- [x] Wire completed 5-image batch to `POST /register-face`
-- [x] Replace old single-capture enrollment page with new flow
+- [x] Keep the deployed face-distance threshold at `0.40` pending broader evidence.
+- [x] Treat clean frames as transient and retain only deduplicated violation evidence.
+- [x] Keep frame-level events distinct from session-level conclusions.
+- [ ] Run a prospective, consented sequential-capture pilot for the candidate repeated-observation policies.
 
----
+## Next product stage
 
-## Phase 1 — Configuration & Security Hardening
-
-- [ ] `config.py` — `extra="forbid"`, split JWT secret, add MinIO/Celery settings
-- [ ] `core/crypto.py` — AES-256-GCM encrypt/decrypt
-- [ ] `core/logger.py` — structlog JSON logger
-
-## Phase 2 — Database Schema & Migrations
-
-- [ ] `models.py` — pgvector, soft deletes, object_key snapshots
-- [ ] Alembic migration
-
-## Phase 3 — Celery Background Processing
-
-- [x] `worker/celery_app.py`
-- [x] `worker/tasks.py` — verify_face_task, upload_snapshot_task, send_result_email_task
-
-## Phase 4 — Student Auth Scoping
-
-- [x] Scoped JWT dependencies
-- [x] Auth on all student endpoints
-- [x] Remove duplicate route
-
-## Phase 5 — Exam Shell Decomposition
-
-- [ ] Decompose 710-line exam page
-- [ ] CSP headers in middleware
-
-## Phase 6 — Service Wiring (Celery + Crypto)
-
-- [ ] service.py — dispatch to Celery, encrypt embeddings
-- [ ] Remove all print() statements
+- [ ] Add examiner-facing session risk summaries based on accumulated events.
+- [ ] Improve evidence-review prioritization and workflow consistency.
+- [ ] Add privacy-controlled incident/evidence export.
+- [ ] Expand integrity, completion, and operational-health analytics.
+- [ ] Add production rate limiting, security headers, alerting, backup/restore drills, and operational runbooks.

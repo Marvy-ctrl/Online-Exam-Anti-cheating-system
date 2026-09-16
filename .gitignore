@@ -77,6 +77,24 @@ performance/.venv/
 performance/results/*
 !performance/results/.gitkeep
 
+# Biometric evaluation inputs and raw outputs contain sensitive face data or
+# biometric-proximity measurements. Keep only examples and empty placeholders.
+performance/biometric/data/*
+!performance/biometric/data/.gitkeep
+performance/biometric/results/*
+!performance/biometric/results/.gitkeep
+
+# Face-worker benchmarks use derived biometric templates and raw per-task
+# timings. Both remain local; only reviewed aggregate reports may be committed.
+performance/face_worker/artifacts/*
+!performance/face_worker/artifacts/.gitkeep
+performance/face_worker/results/*
+!performance/face_worker/results/.gitkeep
+
+# Session-policy simulations are derived from sensitive biometric distances.
+performance/session_policy/results/*
+!performance/session_policy/results/.gitkeep
+
 # Thesis/report drafts — collaborator's convention (added upstream in 26e11ca).
 report/
 
@@ -87,3 +105,4 @@ report/
 !**/.env.example
 !.env.production.example
 performance/.env.example
+tmp
